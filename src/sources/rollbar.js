@@ -31,28 +31,15 @@ function inWindow(item, window) {
     && ts * 1000 < new Date(window.end).getTime();
 }
 
-export async function fetchRollbar({ current, previous }, team) {
-  const tokens = (team?.rollbarReadTokens || []).filter(Boolean);
-  if (!tokens.length) {
-    throw new Error(`rollbarReadTokens is empty for team "${team?.name}" in teams.json`);
-  }
-
-  // Fetch all projects in parallel and concatenate. Wrap in an explicit
-  // arrow so map's (item, index, array) callback signature doesn't leak the
-  // index into rollbarFetchItems' optional `status` parameter.
-  const perProject = await Promise.all(tokens.map(t => rollbarFetchItems(t)));
-  const items = perProject.flat();
-
-  return {
-    current: {
-      count: items.filter(i => inWindow(i, current)).length,
-      openTotal: items.length,
-      projects: tokens.length
-    },
-    previous: {
-      count: items.filter(i => inWindow(i, previous)).length
-    }
-  };
+// Was the item active at any point during the window? Used for "top by
+// occurrences" so currently-still-firing items count for the month they
+// most recently overlapped, even if last_occurrence has since moved past.
+function activeInWindow(item, window) {
+  const startMs = new Date(window.start).getTime();
+  const endMs = new Date(window.end).getTime();
+  const firstMs = (item.first_occurrence_timestamp || 0) * 1000;
+  const lastMs = (item.last_occurrence_timestamp || 0) * 1000;
+  return firstMs < endMs && lastMs >= startMs;
 }
 
 // Was this item open (unresolved) at the given moment? Treats `active` and
@@ -67,6 +54,54 @@ function openAt(item, tMs) {
   return modifiedMs > tMs;
 }
 
+// Pull active + resolved items across all team tokens and dedupe by id.
+// Both the current-period fetch and the history fetch use this so they
+// agree on the underlying dataset.
+async function fetchAllItems(tokens) {
+  const fetches = tokens.flatMap(t => [
+    rollbarFetchItems(t, 'active', 10),
+    rollbarFetchItems(t, 'resolved', 10)
+  ]);
+  const perFetch = await Promise.all(fetches);
+  return [...new Map(perFetch.flat().map(i => [i.id, i])).values()];
+}
+
+export async function fetchRollbar({ current, previous }, team) {
+  const tokens = (team?.rollbarReadTokens || []).filter(Boolean);
+  if (!tokens.length) {
+    throw new Error(`rollbarReadTokens is empty for team "${team?.name}" in teams.json`);
+  }
+
+  const items = await fetchAllItems(tokens);
+  const currentEndMs = new Date(current.end).getTime();
+
+  // Top-3 by lifetime total_occurrences among items active during the review
+  // window (items whose lifetime overlaps the period). Lifetime is the only
+  // count Rollbar's /items/ endpoint exposes — flag this in the Notes label.
+  const topByOccurrences = [...items]
+    .filter(i => activeInWindow(i, current))
+    .sort((a, b) => (b.total_occurrences || 0) - (a.total_occurrences || 0))
+    .slice(0, 3)
+    .map(i => ({
+      title: i.title || `Item ${i.counter}`,
+      occurrences: i.total_occurrences || 0
+    }));
+
+  return {
+    current: {
+      count: items.filter(i => inWindow(i, current)).length,
+      // Open backlog at end of current review period (matches trend chart's
+      // last data point — stable for a given --month, not "now").
+      openTotal: items.filter(i => openAt(i, currentEndMs)).length,
+      topByOccurrences,
+      projects: tokens.length
+    },
+    previous: {
+      count: items.filter(i => inWindow(i, previous)).length
+    }
+  };
+}
+
 // History as monthly snapshots of open errors. Counts items that were
 // unresolved at end-of-month, so resolution work shows up as a downward
 // slope (unlike the volume metric which only ever grows with new errors).
@@ -75,12 +110,7 @@ export async function fetchRollbarHistory(team, windows) {
   if (!tokens.length) {
     throw new Error(`rollbarReadTokens is empty for team "${team?.name}" in teams.json`);
   }
-  const fetches = tokens.flatMap(t => [
-    rollbarFetchItems(t, 'active', 10),
-    rollbarFetchItems(t, 'resolved', 10)
-  ]);
-  const perFetch = await Promise.all(fetches);
-  const items = [...new Map(perFetch.flat().map(i => [i.id, i])).values()];
+  const items = await fetchAllItems(tokens);
   return windows.map(w => {
     const endMs = new Date(w.end).getTime();
     return {

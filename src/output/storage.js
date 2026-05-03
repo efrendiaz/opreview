@@ -89,6 +89,12 @@ function severityNote(bySeverity) {
   return parts.join(', ');
 }
 
+function topOccurrencesNote(top) {
+  if (!top || !top.length) return '';
+  const fmt = n => n.toLocaleString('en-US');
+  return 'Top by occurrences: ' + top.map(t => `"${t.title}" (${fmt(t.occurrences)})`).join(', ');
+}
+
 function prList(prs, max = 5) {
   if (!prs || !prs.length) return '';
   const sorted = [...prs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
@@ -186,11 +192,13 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
     const cc = rb.current?.count;
     const cp = rb.previous?.count;
     const open = rb.current?.openTotal;
+    const top = rb.current?.topByOccurrences;
+    const notes = [`Open at end of period: ${num(open)}`, topOccurrencesNote(top)].filter(Boolean).join('\n');
     out.push(row(
       'Rollbars',
       `Error: ${num(cc)}`,
       `Error: ${num(cp)}${deltaCount(cc, cp)}`,
-      `Open error items count = ${num(open)}`
+      notes
     ));
   }
 
