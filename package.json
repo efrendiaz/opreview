@@ -1,0 +1,20 @@
+{
+  "name": "opreview",
+  "version": "0.1.0",
+  "description": "Gathers monthly operational review data from PagerDuty, Jira, Rollbar, GitHub and Wiz.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "opreview": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "sharp": "^0.34.5"
+  }
+}
