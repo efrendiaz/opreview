@@ -1,26 +1,26 @@
 {
   "$comment": "Copy this to teams.json and fill in. teams.json is gitignored. The user-scoped tokens (PAGERDUTY_TOKEN, JIRA_*, WIZ_CLIENT_*) still live in .env — only team-scoped values go here.",
-  "oranges": {
-    "displayName": "Oranges",
+  "team-a": {
+    "displayName": "Team A",
     "pagerdutyTeamIds": ["PXXXXX"],
-    "jiraJql": "project = ORNG AND issuetype = Incident",
-    "jiraBugsJql": "project = ORNG AND type = Bug",
+    "jiraJql": "project = TEAMA AND issuetype = Incident",
+    "jiraBugsJql": "project = TEAMA AND type = Bug",
     "rollbarReadTokens": [],
     "wizProjectId": "",
-    "githubTopic": "",
+    "githubTopic": "team-a",
     "confluenceParent": {
       "spaceKey": "",
       "folderId": ""
     }
   },
-  "pineapples": {
-    "displayName": "Pineapples",
+  "team-b": {
+    "displayName": "Team B",
     "pagerdutyTeamIds": ["PYYYYY"],
-    "jiraJql": "project = PNAPL AND issuetype = Incident",
-    "jiraBugsJql": "project = PNAPL AND type = Bug",
+    "jiraJql": "project = TEAMB AND issuetype = Incident",
+    "jiraBugsJql": "project = TEAMB AND type = Bug",
     "rollbarReadTokens": [],
     "wizProjectId": "",
-    "githubTopic": "",
+    "githubTopic": "team-b",
     "confluenceParent": {
       "spaceKey": "",
       "folderId": ""

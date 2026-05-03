@@ -1,8 +1,8 @@
 # opreview
 
-CLI for engineering managers at Babbel. Gathers monthly operational review data from PagerDuty, Jira, Rollbar, and GitHub, renders it as a Confluence-shaped report (table + trend charts), and publishes the page directly to the team's Confluence folder.
+CLI for engineering managers. Gathers monthly operational review data from PagerDuty, Jira, Rollbar, and GitHub, renders it as a Confluence-shaped report (table + trend charts), and publishes the page directly to the team's Confluence folder.
 
-Originally built for Oranges and Pineapples; teams.json scales to any number of teams.
+Configure one or more teams in `teams.json` and the same CLI runs for each.
 
 ## What it produces
 
@@ -43,7 +43,7 @@ cp teams.example.json teams.json # add an entry per team you manage
 ### Atlassian / Jira / Confluence (`JIRA_EMAIL`, `JIRA_TOKEN`, `JIRA_BASE_URL`)
 The same Atlassian token works for both Jira and Confluence.
 1. https://id.atlassian.com/manage-profile/security/api-tokens → **Create API token**.
-2. `JIRA_EMAIL` is your Babbel email; `JIRA_TOKEN` is the new token; `JIRA_BASE_URL` is `https://babbel.atlassian.net`.
+2. `JIRA_EMAIL` is your Atlassian login email; `JIRA_TOKEN` is the new token; `JIRA_BASE_URL` is your instance root (e.g. `https://your-org.atlassian.net`).
 
 ### Rollbar (per-project tokens, in `teams.json`)
 Rollbar tokens are scoped to a single project, so each team needs one per project it watches.
@@ -53,8 +53,8 @@ Rollbar tokens are scoped to a single project, so each team needs one per projec
 
 ### GitHub (`GITHUB_TOKEN`, `GITHUB_ORG`)
 1. Generate a PAT at https://github.com/settings/tokens with `repo` and `security_events` scopes (or a fine-grained token with equivalent permissions).
-2. `GITHUB_TOKEN` is the PAT; `GITHUB_ORG` is your org (`lessonnine` for Babbel).
-3. Tag each repo with a topic matching your team name (e.g. `oranges`, `pineapples`). The script discovers repos via that topic.
+2. `GITHUB_TOKEN` is the PAT; `GITHUB_ORG` is your GitHub organization name.
+3. Tag each repo with a topic matching your team name (e.g. `team-a`, `team-b`). The script discovers repos via that topic.
 
 ### Wiz — *not yet wired*
 OAuth is set up but the GraphQL query is a TODO; needs a service account with read access from the security team. Skipped at runtime if env vars are absent.
@@ -68,13 +68,13 @@ Each entry in `teams.json` looks like:
   "your-team": {
     "displayName": "Your Team",
     "pagerdutyTeamIds": ["PXXXXXX"],
-    "jiraJql": "project = BIM AND \"responsible team[dropdown]\" = your-team ORDER BY created DESC",
+    "jiraJql": "project = INC AND \"responsible team[dropdown]\" = your-team ORDER BY created DESC",
     "jiraBugsJql": "project = YOUR AND type = Bug ORDER BY created DESC",
     "rollbarReadTokens": ["...", "..."],
     "wizProjectId": "",
     "githubTopic": "your-team",
     "confluenceParent": {
-      "spaceKey": "RNG",
+      "spaceKey": "XYZ",
       "folderId": "1234567890"
     }
   }

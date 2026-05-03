@@ -1,7 +1,7 @@
 // GitHub: open Dependabot vulnerability alerts and open Dependabot PRs across
-// the team's repos. Repos are identified by a GitHub topic (matches the
-// dependastats convention — repos tagged with the topic "oranges" /
-// "pineapples" belong to that team).
+// the team's repos. Repos are identified by a GitHub topic — set
+// `githubTopic` per team in teams.json, then tag each of the team's repos
+// in GitHub with that same topic so the search query picks them up.
 
 const API = 'https://api.github.com';
 

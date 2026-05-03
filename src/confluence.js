@@ -1,5 +1,5 @@
 // Confluence Cloud client. Uses the same Atlassian email + API token as Jira.
-// JIRA_BASE_URL points at the instance root (e.g. https://babbel.atlassian.net);
+// JIRA_BASE_URL points at the instance root (e.g. https://your-org.atlassian.net);
 // Confluence lives at /wiki on the same domain.
 
 function baseUrl() {

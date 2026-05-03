@@ -41,10 +41,10 @@ Options:
   -h, --help          Show this help
 
 Example:
-  opreview --team oranges --month 2026-04
-  opreview --team pineapples --only pagerduty,jira
-  opreview --team pineapples --check-confluence
-  opreview --team pineapples --month 2026-04 --publish
+  opreview --team team-a --month 2026-04
+  opreview --team team-a --only pagerduty,jira
+  opreview --team team-a --check-confluence
+  opreview --team team-a --month 2026-04 --publish
 `);
       process.exit(0);
     }
