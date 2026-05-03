@@ -49,7 +49,8 @@ The same Atlassian token works for both Jira and Confluence.
 Rollbar tokens are scoped to a single project, so each team needs one per project it watches.
 1. In each Rollbar project: **Project Settings** → **Project Access Tokens** → create one with **read** scope.
 2. Add the token strings into the team's `rollbarReadTokens` array in `teams.json`.
-3. The script always filters to `level=error`, `status=active`, `environment=production`.
+3. The script fetches both active and resolved items so it can compute end-of-month backlog snapshots and surface the top-3 noisiest errors.
+4. **Optional** — set `ROLLBAR_ACCOUNT_SLUG` in `.env` (the segment after `/a/` in any Rollbar URL) to make the top-3 errors clickable links instead of plain text.
 
 ### GitHub (`GITHUB_TOKEN`, `GITHUB_ORG`)
 1. Generate a PAT at https://github.com/settings/tokens with `repo` and `security_events` scopes (or a fine-grained token with equivalent permissions).

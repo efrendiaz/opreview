@@ -6,6 +6,12 @@
 // (one per project) and aggregate the results. Filter mirrors the team's
 // saved Fix query: level=error, status=active, environment=production.
 
+function rollbarItemUrl(item) {
+  const slug = process.env.ROLLBAR_ACCOUNT_SLUG;
+  if (!slug || !item.project_slug || !item.counter) return null;
+  return `https://app.rollbar.com/a/${encodeURIComponent(slug)}/fix/item/${encodeURIComponent(item.project_slug)}/${item.counter}`;
+}
+
 async function rollbarFetchItems(token, status = 'active', maxPages = 5) {
   const items = [];
   for (let page = 1; page <= maxPages; page++) {
@@ -84,7 +90,8 @@ export async function fetchRollbar({ current, previous }, team) {
     .slice(0, 3)
     .map(i => ({
       title: i.title || `Item ${i.counter}`,
-      occurrences: i.total_occurrences || 0
+      occurrences: i.total_occurrences || 0,
+      url: rollbarItemUrl(i)
     }));
 
   return {
