@@ -37,8 +37,10 @@ export async function fetchRollbar({ current, previous }, team) {
     throw new Error(`rollbarReadTokens is empty for team "${team?.name}" in teams.json`);
   }
 
-  // Fetch all projects in parallel and concatenate.
-  const perProject = await Promise.all(tokens.map(rollbarFetchItems));
+  // Fetch all projects in parallel and concatenate. Wrap in an explicit
+  // arrow so map's (item, index, array) callback signature doesn't leak the
+  // index into rollbarFetchItems' optional `status` parameter.
+  const perProject = await Promise.all(tokens.map(t => rollbarFetchItems(t)));
   const items = perProject.flat();
 
   return {
