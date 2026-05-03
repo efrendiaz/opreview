@@ -142,7 +142,12 @@ async function summarize(window, teamIds) {
     mttrHighMs: avg(high.map(resolveMs)),
     mttrLowMs: avg(low.map(resolveMs)),
     recurringTitles: topRecurringTitles(incidents),
-    breaches: countBreaches(incidents)
+    breaches: countBreaches(incidents),
+    highIncidents: high.map(i => ({
+      id: i.id,
+      title: i.title || i.summary || i.id,
+      url: i.html_url
+    }))
   };
 }
 

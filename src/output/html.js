@@ -70,6 +70,13 @@ function recurringNote(titles) {
   return 'Top recurring: ' + titles.map(t => `"${t.title}" (${t.count}x)`).join(', ');
 }
 
+function pdHuList(incidents) {
+  if (!incidents || !incidents.length) return '';
+  return 'HU incidents: ' + incidents.map(i =>
+    `<a href="${esc(i.url)}">${esc(i.id)}</a>`
+  ).join(', ');
+}
+
 function breachNote(b) {
   if (!b) return '';
   const parts = [];
@@ -170,11 +177,12 @@ export function renderHtml(range, data, team) {
   } else {
     const pc = pd.current || {};
     const pp = pd.previous || {};
+    const huAlertsNotes = [pdHuList(pc.highIncidents), recurringNote(pc.recurringTitles)].filter(Boolean).join('\n');
     out.push(row(
       'High Urgency PD Alerts<br>Total PD Alerts',
       `HU: ${num(pc.high)}\nTotal: ${num(pc.total)}`,
       `HU: ${num(pp.high)}${deltaCount(pc.high, pp.high)}\nTotal: ${num(pp.total)}${deltaCount(pc.total, pp.total)}`,
-      recurringNote(pc.recurringTitles)
+      huAlertsNotes
     ));
     out.push(row(
       'MTTA<br>(HU &lt;1h)<br>(LU &lt;9h)',

@@ -59,9 +59,22 @@ function num(v) { return v == null ? '—' : esc(v); }
 
 function issueList(issues) {
   if (!issues || !issues.length) return '';
+  // Use Confluence's Jira issue macro: renders inline as the issue type icon
+  // + key + current status (e.g. "DONE" / "IN PROGRESS"), pulled live from Jira.
   return issues.map(i =>
-    `<a href="${esc(i.url)}">${esc(i.key)}</a>: ${esc(i.summary)}`
+    `<ac:structured-macro ac:name="jira" ac:schema-version="1"><ac:parameter ac:name="key">${esc(i.key)}</ac:parameter></ac:structured-macro>`
   ).join('<br/>');
+}
+
+function pdHuList(incidents) {
+  if (!incidents || !incidents.length) return '';
+  // Smart link form: data-card-appearance="inline" tells Confluence to render
+  // the URL as a card with the PagerDuty icon. Fallback link text is the
+  // short incident ID so the page stays readable even when the PagerDuty
+  // smart-link integration isn't connected to the Confluence space.
+  return 'HU incidents: ' + incidents.map(i =>
+    `<a href="${esc(i.url)}" data-card-appearance="inline">${esc(i.id)}</a>`
+  ).join(', ');
 }
 
 function recurringNote(titles) {
@@ -112,11 +125,12 @@ function prList(prs, max = 5) {
 
 // If the cell already contains pre-built markup, normalise <br>→<br/> so the
 // payload stays well-formed XML; if it's plain text with \n, escape and
-// convert; null becomes em-dash.
+// convert; null becomes em-dash. ac:/ri: prefixes preserve Confluence
+// macros (e.g. the Jira issue macro).
 function asCell(v) {
   if (v == null || v === '') return '';
   const s = String(v);
-  if (/<(br|span|a)\b/i.test(s)) {
+  if (/<(br|span|a|ac:|ri:)/i.test(s)) {
     return s.replace(/<br\s*\/?>(?!\s*\/)/gi, '<br/>').replace(/\n/g, '<br/>');
   }
   return multiline(s);
@@ -144,9 +158,17 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
   out.push(`<tr><th>Owner</th><td>${ownerCell}</td></tr>`);
   out.push('</tbody></table>');
 
-  // Team Metrics
+  // Team Metrics — explicit column widths so the Notes column gets the
+  // lion's share of the row. Confluence Cloud uses pixel widths with a
+  // data-table-width attribute on the <table>; percentages get ignored.
   out.push('<h2>Team Metrics</h2>');
-  out.push('<table>');
+  out.push('<table data-table-width="1200" data-layout="wide">');
+  out.push('<colgroup>');
+  out.push('<col style="width: 160.0px;" />');
+  out.push('<col style="width: 180.0px;" />');
+  out.push('<col style="width: 180.0px;" />');
+  out.push('<col style="width: 680.0px;" />');
+  out.push('</colgroup>');
   out.push('<tbody>');
   out.push('<tr><th>Metric</th><th>Current Period</th><th>Previous Period</th><th>Notes/Comments</th></tr>');
 
@@ -156,11 +178,12 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
   } else {
     const pc = pd.current || {};
     const pp = pd.previous || {};
+    const huAlertsNotes = [pdHuList(pc.highIncidents), recurringNote(pc.recurringTitles)].filter(Boolean).join('\n');
     out.push(row(
       'High Urgency PD Alerts<br/>Total PD Alerts',
       `HU: ${num(pc.high)}\nTotal: ${num(pc.total)}`,
       `HU: ${num(pp.high)}${deltaCount(pc.high, pp.high)}\nTotal: ${num(pp.total)}${deltaCount(pc.total, pp.total)}`,
-      recurringNote(pc.recurringTitles)
+      huAlertsNotes
     ));
     out.push(row(
       'MTTA<br/>(HU &lt;1h)<br/>(LU &lt;9h)',
