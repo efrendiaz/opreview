@@ -115,9 +115,11 @@ function row(metric, current, previous, notes) {
   return `<tr><td>${asCell(metric)}</td><td>${asCell(current)}</td><td>${asCell(previous)}</td><td>${asCell(notes)}</td></tr>`;
 }
 
-export function renderStorage(range, data, team, { chartFilenames = [] } = {}) {
+export function renderStorage(range, data, team, { chartFilenames = [], ownerAccountId = null } = {}) {
   const monthName = monthNameFromLabel(range.label);
-  const owner = process.env.JIRA_EMAIL || '';
+  const ownerCell = ownerAccountId
+    ? `<ac:link><ri:user ri:account-id="${esc(ownerAccountId)}"/></ac:link>`
+    : esc(process.env.JIRA_EMAIL || '');
 
   const out = [];
 
@@ -128,7 +130,7 @@ export function renderStorage(range, data, team, { chartFilenames = [] } = {}) {
   out.push(`<tr><th>Date</th><td>${esc(fmtDate(new Date()))}</td></tr>`);
   out.push(`<tr><th>Review period</th><td>${esc(fmtRange(range.current))}</td></tr>`);
   out.push(`<tr><th>Previous review period</th><td>${esc(fmtRange(range.previous))}</td></tr>`);
-  out.push(`<tr><th>Owner</th><td>${esc(owner)}</td></tr>`);
+  out.push(`<tr><th>Owner</th><td>${ownerCell}</td></tr>`);
   out.push('</tbody></table>');
 
   // Team Metrics

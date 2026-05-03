@@ -12,7 +12,7 @@ import { renderMarkdown } from './output/markdown.js';
 import { renderHtml } from './output/html.js';
 import { renderStorage, renderStorageTitle } from './output/storage.js';
 import { renderTrendCharts, svgToPng } from './output/charts.js';
-import { checkAccess as confluenceCheckAccess, publishPage, pageWebUrl, uploadAttachment } from './confluence.js';
+import { checkAccess as confluenceCheckAccess, publishPage, pageWebUrl, uploadAttachment, getCurrentUser } from './confluence.js';
 
 function parseArgs(argv) {
   const args = { month: undefined, only: undefined, team: undefined, out: 'out', listTeams: false, checkConfluence: false, publish: false, history: 6 };
@@ -190,9 +190,17 @@ async function main() {
   const slug = team.name;
   const chartFilenames = charts.map(c => `trend-${c.name}.png`);
 
+  // For --publish, render the Owner cell as a Confluence user mention so the
+  // page shows @Display Name (linked) instead of a plain email address.
+  let ownerAccountId = null;
+  if (args.publish) {
+    try { ownerAccountId = (await getCurrentUser()).accountId; }
+    catch (e) { console.error(`  (could not fetch current user, falling back to email: ${e.message})`); }
+  }
+
   const md = renderMarkdown(range, data, team);
   const html = renderHtml(range, data, team);
-  const storage = renderStorage(range, data, team, { chartFilenames });
+  const storage = renderStorage(range, data, team, { chartFilenames, ownerAccountId });
   const title = renderStorageTitle(range, team);
 
   await mkdir(args.out, { recursive: true });
