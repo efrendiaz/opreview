@@ -72,9 +72,10 @@ function pdHuList(incidents) {
   // the URL as a card with the PagerDuty icon. Fallback link text is the
   // short incident ID so the page stays readable even when the PagerDuty
   // smart-link integration isn't connected to the Confluence space.
-  return 'HU incidents: ' + incidents.map(i =>
+  // One per line for readability when there are several HU incidents.
+  return 'HU incidents:<br/>' + incidents.map(i =>
     `<a href="${esc(i.url)}" data-card-appearance="inline">${esc(i.id)}</a>`
-  ).join(', ');
+  ).join('<br/>');
 }
 
 function recurringNote(titles) {

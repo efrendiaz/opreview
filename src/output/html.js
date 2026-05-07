@@ -72,9 +72,9 @@ function recurringNote(titles) {
 
 function pdHuList(incidents) {
   if (!incidents || !incidents.length) return '';
-  return 'HU incidents: ' + incidents.map(i =>
+  return 'HU incidents:<br>' + incidents.map(i =>
     `<a href="${esc(i.url)}">${esc(i.id)}</a>`
-  ).join(', ');
+  ).join('<br>');
 }
 
 function breachNote(b) {
