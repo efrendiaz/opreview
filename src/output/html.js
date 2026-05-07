@@ -82,7 +82,7 @@ function recurringNote(titles) {
 function pdHuList(incidents) {
   if (!incidents || !incidents.length) return '';
   return 'HU incidents:<br>' + incidents.map(i =>
-    `<a href="${esc(i.url)}">${esc(i.id)}</a>`
+    `<a href="${esc(i.url)}">${esc(i.title)}</a>`
   ).join('<br>');
 }
 

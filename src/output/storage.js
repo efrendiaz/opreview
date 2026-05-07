@@ -70,11 +70,11 @@ function pdHuList(incidents) {
   if (!incidents || !incidents.length) return '';
   // Smart link form: data-card-appearance="inline" tells Confluence to render
   // the URL as a card with the PagerDuty icon. Fallback link text is the
-  // short incident ID so the page stays readable even when the PagerDuty
+  // incident title so the page stays readable even when the PagerDuty
   // smart-link integration isn't connected to the Confluence space.
   // One per line for readability when there are several HU incidents.
   return 'HU incidents:<br/>' + incidents.map(i =>
-    `<a href="${esc(i.url)}" data-card-appearance="inline">${esc(i.id)}</a>`
+    `<a href="${esc(i.url)}" data-card-appearance="inline">${esc(i.title)}</a>`
   ).join('<br/>');
 }
 
