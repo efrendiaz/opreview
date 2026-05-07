@@ -98,12 +98,12 @@ function severityNote(bySeverity) {
 function topOccurrencesNote(top) {
   if (!top || !top.length) return '';
   const fmt = n => n.toLocaleString('en-US');
-  return 'Top by occurrences: ' + top.map(t => {
+  return 'Top by occurrences:<br>' + top.map(t => {
     const titlePart = t.url
       ? `<a href="${esc(t.url)}">${esc(t.title)}</a>`
       : `"${t.title}"`;
     return `${titlePart} (${fmt(t.occurrences)})`;
-  }).join(', ');
+  }).join('<br>');
 }
 
 function prList(prs, max = 5) {

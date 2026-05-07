@@ -68,19 +68,29 @@ async function getAnalyticsMetrics(since, until, teamIds) {
   const all = [];
   let starting_after = null;
   while (true) {
-    const res = await fetch(`${BASE}/analytics/raw/incidents`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Token token=${process.env.PAGERDUTY_TOKEN}`,
-        Accept: 'application/vnd.pagerduty+json;version=2',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        filters: { created_at_start: since, created_at_end: until, team_ids: teamIds },
-        limit: 1000,
-        starting_after
-      })
-    });
+    let res;
+    let attempt = 0;
+    while (true) {
+      res = await fetch(`${BASE}/analytics/raw/incidents`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Token token=${process.env.PAGERDUTY_TOKEN}`,
+          Accept: 'application/vnd.pagerduty+json;version=2',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          filters: { created_at_start: since, created_at_end: until, team_ids: teamIds },
+          limit: 1000,
+          starting_after
+        })
+      });
+      // PD analytics rate-limits aggressively; exponential backoff up to ~60s
+      // total before giving up. Honours Retry-After when present.
+      if (res.status !== 429 || attempt >= 5) break;
+      const retryAfter = Number(res.headers.get('Retry-After')) || (2 ** attempt);
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      attempt++;
+    }
     if (!res.ok) {
       throw new Error(`PagerDuty /analytics/raw/incidents → ${res.status}: ${await res.text()}`);
     }
