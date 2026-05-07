@@ -17,7 +17,7 @@ export async function svgToPng(svg, { density = 144 } = {}) {
 const PLOT = {
   width: 640,
   height: 220,
-  margin: { top: 30, right: 20, bottom: 36, left: 60 }
+  margin: { top: 50, right: 20, bottom: 36, left: 60 }
 };
 
 function plotArea() {
@@ -141,12 +141,12 @@ export function lineChart({ series, labels, title, sloLines = [], yLabel = Strin
   parts.push(`<text x="${x0 - 6}" y="${y0 + h / 2 + 4}" font-size="11" fill="#5e6c84" text-anchor="end">${esc(yLabel(yMax / 2))}</text>`);
   parts.push(`<text x="${x0 - 6}" y="${y0 + 4}" font-size="11" fill="#5e6c84" text-anchor="end">${esc(yLabel(yMax))}</text>`);
 
-  // SLO threshold lines
+  // SLO threshold lines (no inline label — they overlap when both fall near
+  // the bottom of a tall y-axis; see legend below the title for the key).
   for (const slo of sloLines) {
     const y = yAt(slo.value);
     if (y < y0 || y > y0 + h) continue;
     parts.push(`<line x1="${x0}" y1="${y.toFixed(1)}" x2="${x0 + w}" y2="${y.toFixed(1)}" stroke="${slo.color}" stroke-width="1" stroke-dasharray="4 3"/>`);
-    parts.push(`<text x="${x0 + w - 4}" y="${(y - 4).toFixed(1)}" font-size="10" fill="${slo.color}" text-anchor="end">${esc(slo.label)}</text>`);
   }
 
   // Series: break into runs of consecutive non-null points; draw polyline + dots
@@ -178,13 +178,19 @@ export function lineChart({ series, labels, title, sloLines = [], yLabel = Strin
     parts.push(`<text x="${xAt(i).toFixed(1)}" y="${y0 + h + 18}" font-size="11" fill="#5e6c84" text-anchor="middle">${esc(labels[i])}</text>`);
   }
 
-  // Legend (top-right). Each series gets a dot + name, stacked vertically.
-  for (let i = 0; i < series.length; i++) {
-    const s = series[i];
-    const lx = PLOT.width - PLOT.margin.right - 100;
-    const ly = 16 + i * 14;
-    parts.push(`<circle cx="${lx}" cy="${ly - 4}" r="3" fill="${s.color}"/>`);
-    parts.push(`<text x="${lx + 8}" y="${ly}" font-size="11" fill="#172b4d">${esc(s.name)}</text>`);
+  // Combined legend just below the title — series first (solid dot), then
+  // SLO thresholds (dashed segment). Horizontal so we don't crowd the chart.
+  const legendY = 36;
+  let lx = x0;
+  for (const s of series) {
+    parts.push(`<circle cx="${(lx + 4).toFixed(1)}" cy="${legendY - 4}" r="3.5" fill="${s.color}"/>`);
+    parts.push(`<text x="${lx + 13}" y="${legendY}" font-size="11" fill="#172b4d">${esc(s.name)}</text>`);
+    lx += 13 + s.name.length * 6.5 + 14;
+  }
+  for (const slo of sloLines) {
+    parts.push(`<line x1="${lx.toFixed(1)}" y1="${legendY - 4}" x2="${(lx + 10).toFixed(1)}" y2="${legendY - 4}" stroke="${slo.color}" stroke-width="1.5" stroke-dasharray="3 2"/>`);
+    parts.push(`<text x="${lx + 14}" y="${legendY}" font-size="11" fill="#172b4d">${esc(slo.label)}</text>`);
+    lx += 14 + slo.label.length * 6.5 + 14;
   }
 
   return svgWrap(parts.join('\n  '));
@@ -239,8 +245,8 @@ export function renderTrendCharts({ pd = null, rollbar = null, jira = null, gith
         title: `${team.displayName} — MTTA`,
         yLabel: fmtHours,
         sloLines: [
-          { value: SLO_MS.mtta.high, color: '#d04437', label: 'High Urgency SLO 1h' },
-          { value: SLO_MS.mtta.low, color: '#0052cc', label: 'Low Urgency SLO 9h' }
+          { value: SLO_MS.mtta.high, color: '#d04437', label: '1h SLO' },
+          { value: SLO_MS.mtta.low, color: '#0052cc', label: '9h SLO' }
         ]
       })
     },
@@ -255,8 +261,8 @@ export function renderTrendCharts({ pd = null, rollbar = null, jira = null, gith
         title: `${team.displayName} — MTTR`,
         yLabel: fmtHours,
         sloLines: [
-          { value: SLO_MS.mttr.high, color: '#d04437', label: 'High Urgency SLO 4h' },
-          { value: SLO_MS.mttr.low, color: '#0052cc', label: 'Low Urgency SLO 15h' }
+          { value: SLO_MS.mttr.high, color: '#d04437', label: '4h SLO' },
+          { value: SLO_MS.mttr.low, color: '#0052cc', label: '15h SLO' }
         ]
       })
     });
