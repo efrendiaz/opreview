@@ -1,15 +1,32 @@
+// REPORT_TIMEZONE shifts the month-boundary windows from UTC midnight to local
+// midnight in the given IANA timezone (e.g. "America/New_York"). Without it,
+// "April 2026" runs from 2026-04-01T00:00Z to 2026-05-01T00:00Z, which can
+// pull in incidents that PD's UI shows as March in the user's local time.
+function tzOffsetMs(year, monthIdx, tz) {
+  if (!tz) return 0;
+  // Sample a date well inside the month so DST transitions on the 1st don't
+  // throw off the boundary. The 15th at noon UTC is always inside the month
+  // and well clear of any DST-change time-of-day in any IANA zone.
+  const sampleUtc = Date.UTC(year, monthIdx, 15, 12);
+  const localStr = new Date(sampleUtc).toLocaleString('sv-SE', { timeZone: tz });
+  const localAsUtc = new Date(localStr.replace(' ', 'T') + 'Z');
+  return localAsUtc.getTime() - sampleUtc;
+}
+
 // Build a single month window {label, start, end} from a (year, monthIdx) pair.
 // Re-used by getDateRange (current/previous) and getHistoryRanges (N months back).
+// Boundaries are wall-clock midnight in REPORT_TIMEZONE if set, else UTC.
 function monthWindow(year, monthIdx) {
+  const tz = process.env.REPORT_TIMEZONE;
   // Normalise: monthIdx may be negative when going N months back; wrap year.
   const y = year + Math.floor(monthIdx / 12);
   const m = ((monthIdx % 12) + 12) % 12;
-  const start = new Date(Date.UTC(y, m, 1));
-  const end = new Date(Date.UTC(y, m + 1, 1));
+  const startMs = Date.UTC(y, m, 1) - tzOffsetMs(y, m, tz);
+  const endMs = Date.UTC(y, m + 1, 1) - tzOffsetMs(y, m + 1, tz);
   return {
     label: `${y}-${String(m + 1).padStart(2, '0')}`,
-    start: start.toISOString(),
-    end: end.toISOString()
+    start: new Date(startMs).toISOString(),
+    end: new Date(endMs).toISOString()
   };
 }
 
@@ -36,19 +53,14 @@ export function getDateRange(monthArg) {
     }
   }
 
-  const start = new Date(Date.UTC(year, month, 1));
-  const end = new Date(Date.UTC(year, month + 1, 1));
-  const prevStart = new Date(Date.UTC(year, month - 1, 1));
-  const prevEnd = start;
-
-  const label = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const prevLabel = `${prevStart.getUTCFullYear()}-${String(prevStart.getUTCMonth() + 1).padStart(2, '0')}`;
+  const current = monthWindow(year, month);
+  const previous = monthWindow(year, month - 1);
 
   return {
-    label,
-    prevLabel,
-    current: { start: start.toISOString(), end: end.toISOString() },
-    previous: { start: prevStart.toISOString(), end: prevEnd.toISOString() }
+    label: current.label,
+    prevLabel: previous.label,
+    current: { start: current.start, end: current.end },
+    previous: { start: previous.start, end: previous.end }
   };
 }
 

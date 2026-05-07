@@ -15,6 +15,10 @@ For each team, one Confluence page per month with:
 
 The same content also lands locally as `.md`, `.html`, `.xml` (Confluence storage format), and `.json`.
 
+## Timezone
+
+Set `REPORT_TIMEZONE` in `.env` to your PagerDuty/Jira account's IANA timezone (e.g. `America/New_York`, `Europe/Berlin`) so the monthly window boundaries match what those UIs show. Leave unset and the boundaries are UTC midnight, which can pull in a few incidents the UIs treat as the previous month.
+
 ## Prerequisites
 
 - Node.js 18+
