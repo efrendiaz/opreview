@@ -60,23 +60,37 @@ async function getAllIncidents(since, until, teamIds) {
   return all;
 }
 
-function ackMs(incident) {
-  // First acknowledgement timestamp from the acknowledgements array. If the
-  // incident never got a human ack but was resolved (PD auto-resolved it),
-  // count it as ackMs=0 so the average matches PagerDuty's Insights page,
-  // which treats auto-resolved incidents as if they were ack'd at creation.
-  const acks = incident.acknowledgements || [];
-  if (!acks.length) {
-    return incident.resolved_at ? 0 : null;
+// Pull PD's pre-computed per-incident metrics so MTTA/MTTR match the
+// PagerDuty Insights UI exactly. /incidents.acknowledgements is unreliable
+// for analytics — it omits auto-acks via integrations and log-entry events
+// that PD itself counts as "acknowledged" — so we trust the analytics API.
+async function getAnalyticsMetrics(since, until, teamIds) {
+  const all = [];
+  let starting_after = null;
+  while (true) {
+    const res = await fetch(`${BASE}/analytics/raw/incidents`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token token=${process.env.PAGERDUTY_TOKEN}`,
+        Accept: 'application/vnd.pagerduty+json;version=2',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        filters: { created_at_start: since, created_at_end: until, team_ids: teamIds },
+        limit: 1000,
+        starting_after
+      })
+    });
+    if (!res.ok) {
+      throw new Error(`PagerDuty /analytics/raw/incidents → ${res.status}: ${await res.text()}`);
+    }
+    const data = await res.json();
+    all.push(...(data.data || []));
+    if (!data.more) break;
+    starting_after = data.last;
+    if (all.length > 50000) break; // sanity guard
   }
-  const created = new Date(incident.created_at).getTime();
-  const firstAck = Math.min(...acks.map(a => new Date(a.at).getTime()));
-  return Math.max(0, firstAck - created);
-}
-
-function resolveMs(incident) {
-  if (!incident.resolved_at) return null;
-  return new Date(incident.resolved_at).getTime() - new Date(incident.created_at).getTime();
+  return all;
 }
 
 function avg(nums) {
@@ -121,33 +135,46 @@ function countBreaches(incidents) {
     mttr: { high: 0, low: 0 }
   };
   for (const i of incidents) {
-    const u = i.urgency; // 'high' or 'low'
+    const u = i.urgency;
     if (u !== 'high' && u !== 'low') continue;
-    const a = ackMs(i);
-    if (a != null && a > SLO_MS.mtta[u]) breaches.mtta[u]++;
-    const r = resolveMs(i);
-    if (r != null && r > SLO_MS.mttr[u]) breaches.mttr[u]++;
+    if (i._ackSec != null && i._ackSec * 1000 > SLO_MS.mtta[u]) breaches.mtta[u]++;
+    if (i._resolveSec != null && i._resolveSec * 1000 > SLO_MS.mttr[u]) breaches.mttr[u]++;
   }
   return breaches;
 }
 
 async function summarize(window, teamIds) {
-  const allIncidents = await getAllIncidents(window.start, window.end, teamIds);
+  const [allIncidents, analytics] = await Promise.all([
+    getAllIncidents(window.start, window.end, teamIds),
+    getAnalyticsMetrics(window.start, window.end, teamIds)
+  ]);
+  const metricsMap = new Map(analytics.map(a => [a.id, a]));
+
   const incidents = allIncidents.filter(isProduction);
   const nonProdExcluded = allIncidents.length - incidents.length;
+  // Enrich each incident with PD's pre-computed metrics — these are PD's
+  // authoritative MTTA/MTTR per incident, matching what the Insights UI
+  // displays. The acknowledgements array on /incidents misses some signals
+  // (auto-acks, log-entry events) that PD's analytics pipeline does count.
+  for (const i of incidents) {
+    const m = metricsMap.get(i.id);
+    i._ackSec = m?.seconds_to_first_ack ?? null;
+    i._resolveSec = m?.seconds_to_resolve ?? null;
+  }
   const high = incidents.filter(i => i.urgency === 'high');
   const low = incidents.filter(i => i.urgency === 'low');
 
-  // Return raw ms so the renderer can compute deltas; it formats via formatDuration.
+  const toMs = secs => secs == null ? null : secs * 1000;
+
   return {
     total: incidents.length,
     high: high.length,
     low: low.length,
     nonProdExcluded,
-    mttaHighMs: avg(high.map(ackMs)),
-    mttaLowMs: avg(low.map(ackMs)),
-    mttrHighMs: avg(high.map(resolveMs)),
-    mttrLowMs: avg(low.map(resolveMs)),
+    mttaHighMs: toMs(avg(high.map(i => i._ackSec))),
+    mttaLowMs: toMs(avg(low.map(i => i._ackSec))),
+    mttrHighMs: toMs(avg(high.map(i => i._resolveSec))),
+    mttrLowMs: toMs(avg(low.map(i => i._resolveSec))),
     recurringTitles: topRecurringTitles(incidents),
     breaches: countBreaches(incidents),
     highIncidents: high.map(i => ({
