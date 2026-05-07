@@ -16,11 +16,20 @@ async function rollbarFetchItems(token, status = 'active', maxPages = 5) {
   const items = [];
   for (let page = 1; page <= maxPages; page++) {
     const url = `https://api.rollbar.com/api/1/items/?level=error&status=${status}&environment=production&page=${page}`;
-    const res = await fetch(url, {
-      headers: { 'X-Rollbar-Access-Token': token, Accept: 'application/json' }
-    });
+    let res;
+    let attempt = 0;
+    while (true) {
+      res = await fetch(url, {
+        headers: { 'X-Rollbar-Access-Token': token, Accept: 'application/json' }
+      });
+      // Retry transient gateway errors and rate limits (502/503/504/429).
+      // Up to 4 retries, exponential backoff to ~16s, then surface.
+      if (![502, 503, 504, 429].includes(res.status) || attempt >= 4) break;
+      await new Promise(r => setTimeout(r, (2 ** attempt) * 1000));
+      attempt++;
+    }
     if (!res.ok) {
-      throw new Error(`Rollbar /items/ → ${res.status}: ${await res.text()}`);
+      throw new Error(`Rollbar /items/ → ${res.status}: ${(await res.text()).slice(0, 200)}`);
     }
     const data = await res.json();
     const batch = data?.result?.items || [];

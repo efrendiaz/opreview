@@ -68,25 +68,23 @@ function issueList(issues) {
 
 function pdHuList(incidents) {
   if (!incidents || !incidents.length) return '';
-  // Smart link form: data-card-appearance="inline" tells Confluence to render
-  // the URL as a card with the PagerDuty icon. Fallback link text is the
-  // incident title so the page stays readable even when the PagerDuty
-  // smart-link integration isn't connected to the Confluence space.
-  // One per line for readability when there are several HU incidents.
+  // Plain <a> rather than smart-link form: when the PagerDuty integration
+  // isn't connected to the space, Confluence's smart-link fallback renders
+  // the URL + a "Connect your account" button instead of our link text,
+  // which makes the page unreadable. Plain links just show the title.
   return 'HU incidents:<br/>' + incidents.map(i =>
-    `<a href="${esc(i.url)}" data-card-appearance="inline">${esc(i.title)}</a>`
+    `<a href="${esc(i.url)}">${esc(i.title)}</a>`
   ).join('<br/>');
 }
 
 function recurringNote(titles) {
   if (!titles || !titles.length) return '';
-  // When any entry has a URL we emit smart-link <a> markup, which means
-  // asCell preserves the whole string as HTML — so escape title content
-  // inline. Otherwise pass through plain so asCell escapes once.
+  // Plain <a> for the same reason as pdHuList — the smart-link form drops
+  // a "Connect your account" prompt where the title should render.
   if (titles.some(t => t.url)) {
     return 'Top recurring:<br/>' + titles.map(t => {
       const titlePart = t.url
-        ? `<a href="${esc(t.url)}" data-card-appearance="inline">${esc(t.title)}</a>`
+        ? `<a href="${esc(t.url)}">${esc(t.title)}</a>`
         : `"${esc(t.title)}"`;
       return `${titlePart} (${t.count}x)`;
     }).join('<br/>');
