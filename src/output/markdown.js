@@ -52,7 +52,7 @@ function issueList(issues) {
 
 function recurringNote(titles) {
   if (!titles || !titles.length) return '';
-  return 'Top recurring: ' + titles.map(t => `"${t.title}" (${t.count}x)`).join(', ');
+  return 'Top recurring:\n' + titles.map(t => `"${t.title}" (${t.count}x)`).join('\n');
 }
 
 function pdHuList(incidents) {

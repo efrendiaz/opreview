@@ -82,7 +82,7 @@ function recurringNote(titles) {
   if (!titles || !titles.length) return '';
   // Plain text — asCell will route this through multiline() which escapes
   // once. Do NOT call esc() here or the entities double-escape.
-  return 'Top recurring: ' + titles.map(t => `"${t.title}" (${t.count}x)`).join(', ');
+  return 'Top recurring:\n' + titles.map(t => `"${t.title}" (${t.count}x)`).join('\n');
 }
 
 function breachNote(b) {
