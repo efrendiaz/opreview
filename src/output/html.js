@@ -65,8 +65,17 @@ function issueList(issues) {
 
 function recurringNote(titles) {
   if (!titles || !titles.length) return '';
-  // Plain text — asCell will route this through multiline() which escapes
-  // once. Do NOT call esc() here or the entities double-escape.
+  // If any entry has a URL we emit <a> markup, which means asCell preserves
+  // the whole string as HTML — so escape title content inline. Otherwise
+  // pass through plain so asCell escapes once.
+  if (titles.some(t => t.url)) {
+    return 'Top recurring:<br>' + titles.map(t => {
+      const titlePart = t.url
+        ? `<a href="${esc(t.url)}">${esc(t.title)}</a>`
+        : `"${esc(t.title)}"`;
+      return `${titlePart} (${t.count}x)`;
+    }).join('<br>');
+  }
   return 'Top recurring:\n' + titles.map(t => `"${t.title}" (${t.count}x)`).join('\n');
 }
 

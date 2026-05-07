@@ -126,17 +126,23 @@ export function formatDuration(ms) {
 }
 
 function topRecurringTitles(incidents, topN = 3, minCount = 2) {
-  const counts = new Map();
+  const groups = new Map();
   for (const i of incidents) {
     const t = (i.title || '').trim();
     if (!t) continue;
-    counts.set(t, (counts.get(t) || 0) + 1);
+    let g = groups.get(t);
+    if (!g) {
+      g = { title: t, count: 0, exampleUrl: i.html_url };
+      groups.set(t, g);
+    }
+    g.count++;
+    if (!g.exampleUrl && i.html_url) g.exampleUrl = i.html_url;
   }
-  return [...counts.entries()]
-    .filter(([, c]) => c >= minCount)
-    .sort((a, b) => b[1] - a[1])
+  return [...groups.values()]
+    .filter(g => g.count >= minCount)
+    .sort((a, b) => b.count - a.count)
     .slice(0, topN)
-    .map(([title, count]) => ({ title, count }));
+    .map(g => ({ title: g.title, count: g.count, url: g.exampleUrl }));
 }
 
 function countBreaches(incidents) {
