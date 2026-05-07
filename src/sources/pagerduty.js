@@ -61,9 +61,14 @@ async function getAllIncidents(since, until, teamIds) {
 }
 
 function ackMs(incident) {
-  // First acknowledgement timestamp from the acknowledgements array
+  // First acknowledgement timestamp from the acknowledgements array. If the
+  // incident never got a human ack but was resolved (PD auto-resolved it),
+  // count it as ackMs=0 so the average matches PagerDuty's Insights page,
+  // which treats auto-resolved incidents as if they were ack'd at creation.
   const acks = incident.acknowledgements || [];
-  if (!acks.length) return null;
+  if (!acks.length) {
+    return incident.resolved_at ? 0 : null;
+  }
   const created = new Date(incident.created_at).getTime();
   const firstAck = Math.min(...acks.map(a => new Date(a.at).getTime()));
   return Math.max(0, firstAck - created);
@@ -82,11 +87,13 @@ function avg(nums) {
 
 export function formatDuration(ms) {
   if (ms == null) return 'N/A';
-  if (ms < 1000) return '0s';
-  const sec = Math.floor(ms / 1000);
-  const days = Math.floor(sec / 86400);
-  const hours = Math.floor((sec % 86400) / 3600);
-  const mins = Math.floor((sec % 3600) / 60);
+  if (ms < 30 * 1000) return '0m';
+  // Round to the nearest minute (matches PagerDuty's Insights display) and
+  // recompose into d/h/m so we don't show "60m" or "24h".
+  const totalMins = Math.round(ms / 60000);
+  const days = Math.floor(totalMins / 1440);
+  const hours = Math.floor((totalMins % 1440) / 60);
+  const mins = totalMins % 60;
   const parts = [];
   if (days) parts.push(`${days}d`);
   if (hours) parts.push(`${hours}h`);
