@@ -288,9 +288,9 @@ export function renderTrendCharts({ pd = null, rollbar = null, jira = null, gith
     charts.push({
       name: 'jira-incidents',
       svg: barChart({
-        series: [{ name: 'Open', color: '#d04437', points: incidents }],
+        series: [{ name: 'Created', color: '#d04437', points: incidents }],
         labels,
-        title: `${team.displayName} — Open Jira Incidents at end of month`
+        title: `${team.displayName} — Jira Incidents created per month`
       })
     });
     charts.push({

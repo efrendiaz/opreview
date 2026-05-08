@@ -54,15 +54,15 @@ export async function fetchJira({ current, previous }, team) {
     throw new Error(`jiraJql not set for team "${team?.name}" in teams.json`);
   }
 
-  // Backlog snapshot at end of each window so the table count matches the
-  // trend chart and the issue lists in the Notes column show the chronic
-  // tickets, not just whatever was newly filed in-month.
+  // Incidents are events: count them by when they happened (created in
+  // window), not by current state. Bugs are a backlog metric: count them
+  // as a snapshot of what was open at end of window.
   const [
     currIncidents, prevIncidents,
     currBugs, prevBugs
   ] = await Promise.all([
-    openIssuesAtEndOf(current, team.jiraJql),
-    openIssuesAtEndOf(previous, team.jiraJql),
+    issuesInWindow(current, team.jiraJql),
+    issuesInWindow(previous, team.jiraJql),
     openIssuesAtEndOf(current, team.jiraBugsJql),
     openIssuesAtEndOf(previous, team.jiraBugsJql)
   ]);
@@ -107,9 +107,8 @@ async function openIssuesAtEndOf(window, baseJql) {
   }));
 }
 
-// Snapshot of open incidents and bugs at the end of each window — backlog
-// trend rather than inflow. Bugs JQL is optional (returns null/0 when
-// absent).
+// Trend data: incidents counted by creation in window (events); bugs counted
+// as backlog snapshot at window end.
 export async function fetchJiraHistory(team, windows) {
   const required = ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_TOKEN'];
   const missing = required.filter(k => !process.env[k]);
@@ -119,12 +118,12 @@ export async function fetchJiraHistory(team, windows) {
   }
   return Promise.all(windows.map(async w => {
     const [incidents, bugs] = await Promise.all([
-      openAtEndOf(w, team.jiraJql),
+      issuesInWindow(w, team.jiraJql),
       openAtEndOf(w, team.jiraBugsJql)
     ]);
     return {
       label: w.label,
-      incidents: incidents ?? 0,
+      incidents: incidents?.length ?? 0,
       bugs: bugs ?? 0
     };
   }));
