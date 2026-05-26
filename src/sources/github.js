@@ -48,22 +48,6 @@ async function listReposByTopic(org, topic) {
   return ghPaginate(`/search/repositories?q=${q}&per_page=100`);
 }
 
-async function fetchOpenAlerts(fullName) {
-  try {
-    return await ghPaginate(`/repos/${fullName}/dependabot/alerts?state=open&per_page=100`);
-  } catch (err) {
-    // Some repos disable Dependabot or restrict alert visibility — treat as
-    // empty rather than failing the whole team's run.
-    if (err.status === 404 || err.status === 403) return [];
-    throw err;
-  }
-}
-
-async function fetchDependabotPRs(fullName) {
-  const all = await ghPaginate(`/repos/${fullName}/pulls?state=open&per_page=100`);
-  return all.filter(pr => (pr.user?.login || '').startsWith('dependabot'));
-}
-
 // Paginate through a list endpoint sorted by `updated` desc, stopping when an
 // item older than sinceMs is reached. Used by the historical fetchers so we
 // only pull as much closed/resolved data as we need to reconstruct snapshots
@@ -137,7 +121,7 @@ function prOpenAt(pr, tMs) {
   return new Date(pr.closed_at).getTime() > tMs;
 }
 
-export async function fetchGitHub(_range, team) {
+export async function fetchGitHub({ current, previous }, team) {
   if (!process.env.GITHUB_TOKEN) {
     throw new Error('GITHUB_TOKEN not set in .env');
   }
@@ -151,52 +135,55 @@ export async function fetchGitHub(_range, team) {
 
   const repos = await listReposByTopic(org, team.githubTopic);
 
-  // Fetch alerts + PRs for every repo in parallel.
+  // End-of-period snapshots (matches the chart and the "Review period" header).
+  // A live count would drift from the chart's last bar by however many days the
+  // run happens after the period ends, which confuses readers comparing the two.
+  const currentEndMs = new Date(current.end).getTime();
+  const prevEndMs = new Date(previous.end).getTime();
+  const sinceMs = new Date(previous.start).getTime();
+
   const perRepo = await Promise.all(repos.map(async r => {
     const [alerts, prs] = await Promise.all([
-      fetchOpenAlerts(r.full_name),
-      fetchDependabotPRs(r.full_name)
+      fetchHistoricalAlerts(r.full_name, sinceMs),
+      fetchHistoricalDependabotPRs(r.full_name, sinceMs)
     ]);
-    return {
-      nameWithOwner: r.full_name,
-      url: r.html_url,
-      alerts: alerts.map(a => ({
-        title: a.security_advisory?.summary || 'Security alert',
-        url: a.html_url,
-        severity: (a.security_advisory?.severity || 'unknown').toLowerCase(),
-        package: a.dependency?.package?.name || '',
-        repo: r.full_name
-      })),
-      prs: prs.map(p => ({
-        title: p.title,
-        url: p.html_url,
-        createdAt: p.created_at,
-        repo: r.full_name
-      }))
-    };
+    return { repo: r.full_name, alerts, prs };
   }));
 
-  const allAlerts = perRepo.flatMap(r => r.alerts);
-  const allPRs = perRepo.flatMap(r => r.prs);
+  const allAlerts = perRepo.flatMap(r => r.alerts.map(a => ({ ...a, _repo: r.repo })));
+  const allPRs = perRepo.flatMap(r => r.prs.map(p => ({ ...p, _repo: r.repo })));
 
-  const bySeverity = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 };
-  for (const a of allAlerts) {
-    bySeverity[Object.hasOwn(bySeverity, a.severity) ? a.severity : 'unknown']++;
+  function snapshotAt(endMs) {
+    const openAlerts = allAlerts.filter(a => alertOpenAt(a, endMs));
+    const openPRs = allPRs.filter(p => prOpenAt(p, endMs));
+    const bySeverity = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 };
+    const items = openAlerts.map(a => ({
+      title: a.security_advisory?.summary || 'Security alert',
+      url: a.html_url,
+      severity: (a.security_advisory?.severity || 'unknown').toLowerCase(),
+      package: a.dependency?.package?.name || '',
+      repo: a._repo
+    }));
+    for (const a of items) {
+      bySeverity[Object.hasOwn(bySeverity, a.severity) ? a.severity : 'unknown']++;
+    }
+    return {
+      vulnerabilities: { total: items.length, bySeverity, items },
+      dependabotPRs: {
+        total: openPRs.length,
+        items: openPRs.map(p => ({
+          title: p.title,
+          url: p.html_url,
+          createdAt: p.created_at,
+          repo: p._repo
+        }))
+      }
+    };
   }
 
   return {
-    current: {
-      repos: perRepo.length,
-      vulnerabilities: {
-        total: allAlerts.length,
-        bySeverity,
-        items: allAlerts
-      },
-      dependabotPRs: {
-        total: allPRs.length,
-        items: allPRs
-      }
-    }
+    current: { repos: perRepo.length, ...snapshotAt(currentEndMs) },
+    previous: snapshotAt(prevEndMs)
   };
 }
 

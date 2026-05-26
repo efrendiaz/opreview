@@ -145,17 +145,36 @@ function topRecurringTitles(incidents, topN = 3, minCount = 2) {
     .map(g => ({ title: g.title, count: g.count, url: g.exampleUrl }));
 }
 
-function countBreaches(incidents) {
+function collectBreaches(incidents, topN = 3) {
+  // Per-metric counts plus the top-N breachers (across both urgencies)
+  // sorted by how far past the SLO they ran. Top list is what renderers
+  // surface as clickable links beneath the "SLO breaches: HU N, LU M" line.
   const breaches = {
-    mtta: { high: 0, low: 0 },
-    mttr: { high: 0, low: 0 }
+    mtta: { high: 0, low: 0, top: [] },
+    mttr: { high: 0, low: 0, top: [] }
   };
+  const all = { mtta: [], mttr: [] };
   for (const i of incidents) {
     const u = i.urgency;
     if (u !== 'high' && u !== 'low') continue;
-    if (i._ackSec != null && i._ackSec * 1000 > SLO_MS.mtta[u]) breaches.mtta[u]++;
-    if (i._resolveSec != null && i._resolveSec * 1000 > SLO_MS.mttr[u]) breaches.mttr[u]++;
+    const ref = { id: i.id, title: i.title || i.summary || i.id, url: i.html_url, urgency: u };
+    if (i._ackSec != null) {
+      const overshoot = i._ackSec * 1000 - SLO_MS.mtta[u];
+      if (overshoot > 0) {
+        breaches.mtta[u]++;
+        all.mtta.push({ ...ref, overshootMs: overshoot });
+      }
+    }
+    if (i._resolveSec != null) {
+      const overshoot = i._resolveSec * 1000 - SLO_MS.mttr[u];
+      if (overshoot > 0) {
+        breaches.mttr[u]++;
+        all.mttr.push({ ...ref, overshootMs: overshoot });
+      }
+    }
   }
+  breaches.mtta.top = all.mtta.sort((a, b) => b.overshootMs - a.overshootMs).slice(0, topN);
+  breaches.mttr.top = all.mttr.sort((a, b) => b.overshootMs - a.overshootMs).slice(0, topN);
   return breaches;
 }
 
@@ -192,7 +211,7 @@ async function summarize(window, teamIds) {
     mttrHighMs: toMs(avg(high.map(i => i._resolveSec))),
     mttrLowMs: toMs(avg(low.map(i => i._resolveSec))),
     recurringTitles: topRecurringTitles(incidents),
-    breaches: countBreaches(incidents),
+    breaches: collectBreaches(incidents),
     highIncidents: high.map(i => ({
       id: i.id,
       title: i.title || i.summary || i.id,

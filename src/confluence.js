@@ -103,6 +103,19 @@ async function updatePage({ id, currentVersion, title, storage }) {
   });
 }
 
+// Carry over the team-authored sections (Service Metrics, Action Items) from
+// the existing page so re-publishing doesn't wipe what the team typed in.
+// The renderer always emits those two <h2>s last and empty; we just splice
+// from the first one in the existing storage and append it to the new one.
+function preserveManualSections(newStorage, existingStorage) {
+  if (!existingStorage) return newStorage;
+  const re = /<h2[^>]*>\s*Service Metrics\s*<\/h2>/;
+  const newMatch = newStorage.match(re);
+  const oldMatch = existingStorage.match(re);
+  if (!newMatch || !oldMatch) return newStorage;
+  return newStorage.slice(0, newMatch.index) + existingStorage.slice(oldMatch.index);
+}
+
 // Publish (create or update) a page under the team's parent folder. Idempotent
 // by exact title match within the folder. Returns { page, created } where
 // page has id, title, version, and a webui link to view it.
@@ -119,11 +132,12 @@ export async function publishPage(team, title, storage) {
 
   const existing = await findPageByTitle({ spaceId, parentId: cp.folderId, title });
   if (existing) {
+    const merged = preserveManualSections(storage, existing.body?.storage?.value);
     const page = await updatePage({
       id: existing.id,
       currentVersion: existing.version?.number || 1,
       title,
-      storage
+      storage: merged
     });
     return { page, created: false };
   }

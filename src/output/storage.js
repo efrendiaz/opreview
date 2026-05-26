@@ -97,17 +97,16 @@ function breachNote(b) {
   const parts = [];
   if (b.high > 0) parts.push(`HU ${b.high}`);
   if (b.low > 0) parts.push(`LU ${b.low}`);
-  return parts.length ? 'SLO breaches: ' + parts.join(', ') : 'Within SLO';
-}
-
-function severityNote(bySeverity) {
-  if (!bySeverity) return '';
-  const order = ['critical', 'high', 'medium', 'low'];
-  const parts = order
-    .filter(k => bySeverity[k] > 0)
-    .map(k => `${k[0].toUpperCase()}${k.slice(1)}: ${bySeverity[k]}`);
-  if (bySeverity.unknown > 0) parts.push(`Unknown: ${bySeverity.unknown}`);
-  return parts.join(', ');
+  if (!parts.length) return 'Within SLO';
+  const head = 'SLO breaches: ' + parts.join(', ');
+  if (!b.top || !b.top.length) return head;
+  // Plain <a> rather than smart-link form — same reason as pdHuList: Confluence
+  // shows a "Connect your account" prompt instead of our link text otherwise.
+  const lines = b.top.map(t => {
+    const tag = t.urgency === 'high' ? 'HU' : 'LU';
+    return `<a href="${esc(t.url)}">${esc(t.title)}</a> (${tag} +${esc(formatDuration(t.overshootMs))} over)`;
+  });
+  return head + '<br/>' + lines.join('<br/>');
 }
 
 function topOccurrencesNote(top) {
@@ -121,14 +120,40 @@ function topOccurrencesNote(top) {
   }).join('<br/>');
 }
 
-function prList(prs, max = 5) {
-  if (!prs || !prs.length) return '';
-  const sorted = [...prs].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-  const items = sorted.slice(0, max).map(p =>
-    `<a href="${esc(p.url)}">${esc(p.title)}</a> — ${esc(p.repo)}`
-  );
-  if (sorted.length > max) items.push(`...and ${sorted.length - max} more`);
-  return items.join('<br/>');
+const SEVERITY_COLOR = { critical: '#990000', high: '#d04437', medium: '#e8a200', low: '#36b37e' };
+
+function vulnsByRepoNote(items) {
+  if (!items || !items.length) return '';
+  const byRepo = new Map();
+  for (const a of items) {
+    let g = byRepo.get(a.repo);
+    if (!g) { g = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 }; byRepo.set(a.repo, g); }
+    g[Object.hasOwn(g, a.severity) ? a.severity : 'unknown']++;
+  }
+  const order = ['critical', 'high', 'medium', 'low'];
+  return [...byRepo.entries()]
+    .map(([repo, s]) => ({ repo, s, total: s.critical + s.high + s.medium + s.low + s.unknown }))
+    .sort((a, b) => b.total - a.total)
+    .map(({ repo, s, total }) => {
+      const parts = order
+        .filter(k => s[k] > 0)
+        .map(k => `<span style="color:${SEVERITY_COLOR[k]}">${k[0].toUpperCase()}${k.slice(1)}: ${s[k]}</span>`);
+      if (s.unknown > 0) parts.push(`Unknown: ${s.unknown}`);
+      return `<a href="https://github.com/${esc(repo)}/security/dependabot">${esc(repo)}</a>: ${total} (${parts.join(', ')})`;
+    })
+    .join('<br/>');
+}
+
+function prsByRepoNote(items) {
+  if (!items || !items.length) return '';
+  const counts = new Map();
+  for (const p of items) counts.set(p.repo, (counts.get(p.repo) || 0) + 1);
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([repo, n]) =>
+      `<a href="https://github.com/${esc(repo)}/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot">${esc(repo)}</a>: ${n}`
+    )
+    .join('<br/>');
 }
 
 // If the cell already contains pre-built markup, normalise <br>→<br/> so the
@@ -189,20 +214,20 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
     const huAlertsNotes = [pdHuList(pc.highIncidents), recurringNote(pc.recurringTitles)].filter(Boolean).join('\n');
     out.push(row(
       'High Urgency PD Alerts<br/>Total PD Alerts',
-      `HU: ${num(pc.high)}\nTotal: ${num(pc.total)}`,
-      `HU: ${num(pp.high)}${deltaCount(pc.high, pp.high)}\nTotal: ${num(pp.total)}${deltaCount(pc.total, pp.total)}`,
+      `HU: ${num(pc.high)}${deltaCount(pc.high, pp.high)}\nTotal: ${num(pc.total)}${deltaCount(pc.total, pp.total)}`,
+      `HU: ${num(pp.high)}\nTotal: ${num(pp.total)}`,
       huAlertsNotes
     ));
     out.push(row(
       'MTTA<br/>(HU &lt;1h)<br/>(LU &lt;9h)',
-      `High: ${esc(formatDuration(pc.mttaHighMs))}\nLow: ${esc(formatDuration(pc.mttaLowMs))}`,
-      `High: ${esc(formatDuration(pp.mttaHighMs))}${deltaDuration(pc.mttaHighMs, pp.mttaHighMs)}\nLow: ${esc(formatDuration(pp.mttaLowMs))}${deltaDuration(pc.mttaLowMs, pp.mttaLowMs)}`,
+      `High: ${esc(formatDuration(pc.mttaHighMs))}${deltaDuration(pc.mttaHighMs, pp.mttaHighMs)}\nLow: ${esc(formatDuration(pc.mttaLowMs))}${deltaDuration(pc.mttaLowMs, pp.mttaLowMs)}`,
+      `High: ${esc(formatDuration(pp.mttaHighMs))}\nLow: ${esc(formatDuration(pp.mttaLowMs))}`,
       breachNote(pc.breaches?.mtta)
     ));
     out.push(row(
       'MTTR<br/>(HU &lt;4h)<br/>(LU &lt;15h)',
-      `High: ${esc(formatDuration(pc.mttrHighMs))}\nLow: ${esc(formatDuration(pc.mttrLowMs))}`,
-      `High: ${esc(formatDuration(pp.mttrHighMs))}${deltaDuration(pc.mttrHighMs, pp.mttrHighMs)}\nLow: ${esc(formatDuration(pp.mttrLowMs))}${deltaDuration(pc.mttrLowMs, pp.mttrLowMs)}`,
+      `High: ${esc(formatDuration(pc.mttrHighMs))}${deltaDuration(pc.mttrHighMs, pp.mttrHighMs)}\nLow: ${esc(formatDuration(pc.mttrLowMs))}${deltaDuration(pc.mttrLowMs, pp.mttrLowMs)}`,
+      `High: ${esc(formatDuration(pp.mttrHighMs))}\nLow: ${esc(formatDuration(pp.mttrLowMs))}`,
       breachNote(pc.breaches?.mttr)
     ));
   }
@@ -215,8 +240,8 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
     const ip = jira.previous?.incidents || [];
     out.push(row(
       'Jira Incidents',
-      num(ic.length),
-      num(ip.length) + deltaCount(ic.length, ip.length),
+      num(ic.length) + deltaCount(ic.length, ip.length),
+      num(ip.length),
       issueList(ic)
     ));
   }
@@ -232,8 +257,8 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
     const notes = [`Open at end of period: ${num(open)}`, topOccurrencesNote(top)].filter(Boolean).join('\n');
     out.push(row(
       'Rollbars',
-      `Error: ${num(cc)}`,
-      `Error: ${num(cp)}${deltaCount(cc, cp)}`,
+      `Error: ${num(cc)}${deltaCount(cc, cp)}`,
+      `Error: ${num(cp)}`,
       notes
     ));
   }
@@ -244,18 +269,20 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
     out.push(row('Dependabot PRs', `error: ${gh.error}`, '', ''));
   } else {
     const vc = gh.current?.vulnerabilities || {};
+    const vp = gh.previous?.vulnerabilities?.total;
     out.push(row(
       'Vulnerabilities',
-      num(vc.total),
-      '—',
-      severityNote(vc.bySeverity)
+      num(vc.total) + deltaCount(vc.total, vp),
+      num(vp),
+      vulnsByRepoNote(vc.items)
     ));
     const dp = gh.current?.dependabotPRs || {};
+    const pp = gh.previous?.dependabotPRs?.total;
     out.push(row(
       'Dependabot PRs',
-      num(dp.total),
-      '—',
-      prList(dp.items)
+      num(dp.total) + deltaCount(dp.total, pp),
+      num(pp),
+      prsByRepoNote(dp.items)
     ));
   }
 
@@ -279,8 +306,8 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
     const bp = jira.previous?.bugs || [];
     out.push(row(
       'Bugs',
-      num(bc.length),
-      num(bp.length) + deltaCount(bc.length, bp.length),
+      num(bc.length) + deltaCount(bc.length, bp.length),
+      num(bp.length),
       issueList(bc)
     ));
   }
