@@ -8,6 +8,8 @@
     "rollbarReadTokens": [],
     "wizProjectId": "",
     "githubTopic": "team-a",
+    "speedcurveApiKey": "",
+    "speedcurveSiteIds": [],
     "confluenceParent": {
       "spaceKey": "",
       "folderId": ""
@@ -21,6 +23,8 @@
     "rollbarReadTokens": [],
     "wizProjectId": "",
     "githubTopic": "team-b",
+    "speedcurveApiKey": "",
+    "speedcurveSiteIds": [],
     "confluenceParent": {
       "spaceKey": "",
       "folderId": ""
