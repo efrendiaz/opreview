@@ -316,12 +316,36 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
   out.push('</table>');
 
   // Trends — image refs for chart attachments uploaded separately to the page.
-  // Confluence renders these inline once the matching attachment exists.
-  if (chartFilenames.length) {
+  // Confluence renders these inline once the matching attachment exists. The
+  // review-load chart is shown in its own section below, not here.
+  const reviewLoadFilename = 'trend-review-load.png';
+  const trendFilenames = chartFilenames.filter(f => f !== reviewLoadFilename);
+  if (trendFilenames.length) {
     out.push('<h2>Trends</h2>');
-    for (const filename of chartFilenames) {
+    for (const filename of trendFilenames) {
       out.push(`<p><ac:image ac:align="center" ac:width="640"><ri:attachment ri:filename="${esc(filename)}"/></ac:image></p>`);
     }
+  }
+
+  // Review Load — chart (attachment) + detailed per-engineer table.
+  const reviewerStats = data.github?.current?.teamPRs?.reviewerStats;
+  out.push('<h2>Review Load</h2>');
+  out.push('<p><em>Current period. Sized by review events (proxy for review effort).</em></p>');
+  if (reviewerStats && reviewerStats.length) {
+    if (chartFilenames.includes(reviewLoadFilename)) {
+      out.push(`<p><ac:image ac:align="center" ac:width="640"><ri:attachment ri:filename="${esc(reviewLoadFilename)}"/></ac:image></p>`);
+    }
+    const totalEvents = reviewerStats.reduce((s, r) => s + r.events, 0) || 1;
+    out.push('<table>');
+    out.push('<tbody>');
+    out.push('<tr><th>Engineer</th><th>PRs reviewed</th><th>Approvals</th><th>Review events</th><th>% of events</th></tr>');
+    for (const r of reviewerStats) {
+      const pct = Math.round((r.events / totalEvents) * 100);
+      out.push(`<tr><td>@${esc(r.login)}</td><td>${r.prs}</td><td>${r.approvals}</td><td>${r.events}</td><td>${pct}%</td></tr>`);
+    }
+    out.push('</tbody></table>');
+  } else {
+    out.push('<p><em>No review activity in this period.</em></p>');
   }
 
   out.push('<h2>Service Metrics</h2>');

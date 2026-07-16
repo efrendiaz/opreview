@@ -11,7 +11,7 @@ import { fetchGitHub, fetchGitHubHistory } from './sources/github.js';
 import { renderMarkdown } from './output/markdown.js';
 import { renderHtml } from './output/html.js';
 import { renderStorage, renderStorageTitle } from './output/storage.js';
-import { renderTrendCharts, svgToPng } from './output/charts.js';
+import { renderTrendCharts, renderReviewLoadChart, svgToPng } from './output/charts.js';
 import { checkAccess as confluenceCheckAccess, publishPage, pageWebUrl, uploadAttachment, getCurrentUser } from './confluence.js';
 
 function parseArgs(argv) {
@@ -185,6 +185,15 @@ async function main() {
       c.png = await svgToPng(c.svg);
       charts.push(c);
     }
+  }
+
+  // Review-load chart — built regardless of --history from the current-period
+  // reviewer stats, then treated like any other chart (rasterised, written,
+  // attached to Confluence).
+  const reviewLoadChart = renderReviewLoadChart(data.github?.current?.teamPRs?.reviewerStats, team);
+  if (reviewLoadChart) {
+    reviewLoadChart.png = await svgToPng(reviewLoadChart.svg);
+    charts.push(reviewLoadChart);
   }
 
   const slug = team.name;

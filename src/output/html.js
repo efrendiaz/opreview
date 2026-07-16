@@ -4,6 +4,7 @@
 // native table with the multi-line cells, hyperlinks, and coloured deltas.
 
 import { formatDuration } from '../sources/pagerduty.js';
+import { renderReviewLoadChart } from './charts.js';
 
 const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -312,6 +313,24 @@ export function renderHtml(range, data, team) {
 
   out.push('  </tbody>');
   out.push('</table>');
+
+  const reviewerStats = data.github?.current?.teamPRs?.reviewerStats;
+  out.push('<h2>Review Load</h2>');
+  out.push('<p><em>Current period. Sized by review events (proxy for review effort).</em></p>');
+  if (reviewerStats && reviewerStats.length) {
+    const chart = renderReviewLoadChart(reviewerStats, team);
+    if (chart) out.push(`<p>${chart.svg}</p>`);
+    const totalEvents = reviewerStats.reduce((s, r) => s + r.events, 0) || 1;
+    out.push('<table><thead><tr><th>Engineer</th><th>PRs reviewed</th><th>Approvals</th><th>Review events</th><th>% of events</th></tr></thead>');
+    out.push('  <tbody>');
+    for (const r of reviewerStats) {
+      const pct = Math.round((r.events / totalEvents) * 100);
+      out.push(`    <tr><td>@${esc(r.login)}</td><td>${r.prs}</td><td>${r.approvals}</td><td>${r.events}</td><td>${pct}%</td></tr>`);
+    }
+    out.push('  </tbody></table>');
+  } else {
+    out.push('<p><em>No review activity in this period.</em></p>');
+  }
 
   out.push('<h2>Service Metrics</h2>');
   out.push('<h2>Action Items</h2>');

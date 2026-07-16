@@ -39,7 +39,13 @@ function esc(s) {
 }
 
 function svgWrap(content) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${PLOT.width} ${PLOT.height}" width="${PLOT.width}" height="${PLOT.height}" font-family="-apple-system, sans-serif">
+  return svgDoc(PLOT.width, PLOT.height, content);
+}
+
+// Like svgWrap but with explicit dimensions — used by charts whose height
+// depends on the data (e.g. one row per reviewer).
+function svgDoc(width, height, content) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="-apple-system, sans-serif">
 ${content}
 </svg>`;
 }
@@ -194,6 +200,55 @@ export function lineChart({ series, labels, title, sloLines = [], yLabel = Strin
   }
 
   return svgWrap(parts.join('\n  '));
+}
+
+// Horizontal bar chart: one bar per row, sized by row.value. Labels sit in the
+// left margin, the value is printed at the end of each bar. Height grows with
+// the number of rows, so it suits per-entity breakdowns (one row per engineer).
+export function hBarChart({ rows = [], title, valueLabel = String }) {
+  const rowH = 20;
+  const gap = 8;
+  const marginTop = title ? 44 : 14;
+  const marginBottom = 14;
+  const marginLeft = 150; // room for reviewer logins
+  const marginRight = 52; // room for the value label after the bar
+  const width = PLOT.width;
+  const plotW = width - marginLeft - marginRight;
+  const height = marginTop + marginBottom + rows.length * (rowH + gap);
+  const max = niceCeil(Math.max(1, ...rows.map(r => r.value ?? 0)));
+
+  const parts = [];
+  if (title) parts.push(`<text x="${width / 2}" y="20" font-size="13" fill="#172b4d" text-anchor="middle" font-weight="600">${esc(title)}</text>`);
+
+  rows.forEach((r, i) => {
+    const y = marginTop + i * (rowH + gap);
+    const v = r.value ?? 0;
+    const barW = (v / max) * plotW;
+    const textY = y + rowH * 0.72;
+    parts.push(`<text x="${marginLeft - 8}" y="${textY.toFixed(1)}" font-size="11" fill="#172b4d" text-anchor="end">${esc(r.label)}</text>`);
+    parts.push(`<rect x="${marginLeft}" y="${y}" width="${Math.max(0, barW).toFixed(1)}" height="${rowH}" fill="#0052cc"/>`);
+    parts.push(`<text x="${(marginLeft + Math.max(0, barW) + 6).toFixed(1)}" y="${textY.toFixed(1)}" font-size="11" fill="#5e6c84" text-anchor="start">${esc(valueLabel(v))}</text>`);
+  });
+
+  return svgDoc(width, height, parts.join('\n  '));
+}
+
+// Build the "Review Load" chart for a team from its reviewer stats. Bars are
+// sized by review events (the best proxy for time spent reviewing). Returns
+// null when there is no review activity to show.
+export function renderReviewLoadChart(reviewerStats, team, { top = 15 } = {}) {
+  if (!reviewerStats || !reviewerStats.length) return null;
+  const rows = [...reviewerStats]
+    .sort((a, b) => b.events - a.events)
+    .slice(0, top)
+    .map(s => ({ label: s.login, value: s.events }));
+  return {
+    name: 'review-load',
+    svg: hBarChart({
+      rows,
+      title: `${team.displayName} — Review load (review events, current period)`
+    })
+  };
 }
 
 // Round up to a friendlier number (10, 50, 100, 200, 500, 1000, ...) so the

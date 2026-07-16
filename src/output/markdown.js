@@ -274,6 +274,23 @@ export function renderMarkdown(range, data, team) {
     ));
   }
 
+  const reviewerStats = data.github?.current?.teamPRs?.reviewerStats;
+  lines.push('');
+  lines.push('## Review Load');
+  lines.push('');
+  lines.push('_Current period. Sized by review events (proxy for review effort)._');
+  lines.push('');
+  if (reviewerStats && reviewerStats.length) {
+    const totalEvents = reviewerStats.reduce((s, r) => s + r.events, 0) || 1;
+    lines.push('| Engineer | PRs reviewed | Approvals | Review events | % of events |');
+    lines.push('|---|---|---|---|---|');
+    for (const r of reviewerStats) {
+      const pct = Math.round((r.events / totalEvents) * 100);
+      lines.push(`| @${r.login} | ${r.prs} | ${r.approvals} | ${r.events} | ${pct}% |`);
+    }
+  } else {
+    lines.push('_No review activity in this period._');
+  }
   lines.push('');
   lines.push('## Service Metrics');
   lines.push('');
