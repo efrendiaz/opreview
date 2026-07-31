@@ -170,8 +170,8 @@ export function reviewersFromReviews(reviews, authorLogin = '') {
   return [...new Set(reviewEventsFromReviews(reviews, authorLogin).map(e => e.login))];
 }
 
-// Per-reviewer stats across the given PRs. Bots ([bot] suffix) and excludeLogins
-// are omitted. For each human reviewer:
+// Per-reviewer stats across the given PRs. excludeLogins are omitted; bots
+// that review (Copilot, bugbot, …) count like any reviewer. For each reviewer:
 //   prs       — distinct PRs they reviewed
 //   approvals — count of real APPROVED events (re-approvals counted separately)
 //   events    — count of all review events (approve/changes/comment) — the best
@@ -179,7 +179,7 @@ export function reviewersFromReviews(reviews, authorLogin = '') {
 // Sorted by events descending.
 export function computeReviewerStats(enriched, excludeLogins = []) {
   const exclude = new Set((excludeLogins || []).map(l => l.toLowerCase()));
-  const skip = login => login.endsWith('[bot]') || exclude.has(login.toLowerCase());
+  const skip = login => exclude.has(login.toLowerCase());
 
   const byLogin = new Map();
   for (const pr of enriched) {
@@ -223,8 +223,7 @@ export async function mapLimit(items, limit, fn) {
 }
 
 // Aggregate enriched PRs into the metrics shown in the report. Reviewer load
-// counts distinct reviewers per PR; bots ([bot] suffix) and excludeLogins are
-// omitted.
+// counts distinct reviewers per PR (bots included); excludeLogins are omitted.
 export function computePRMetrics(enriched, excludeLogins = []) {
   const mergeTimes = enriched.map(p => p.timeToMergeMs).filter(t => t != null);
   const totalComments = enriched.reduce((s, p) => s + p.comments, 0);
@@ -233,7 +232,7 @@ export function computePRMetrics(enriched, excludeLogins = []) {
   const reviewerLoad = {};
   for (const pr of enriched) {
     for (const login of pr.reviewers) {
-      if (login.endsWith('[bot]') || excludeSet.has(login.toLowerCase())) continue;
+      if (excludeSet.has(login.toLowerCase())) continue;
       reviewerLoad[login] = (reviewerLoad[login] || 0) + 1;
     }
   }

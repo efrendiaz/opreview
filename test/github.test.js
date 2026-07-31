@@ -144,11 +144,19 @@ test('computePRMetrics aggregates totals, median, avg comments and reviewer load
   assert.deepEqual(m.reviewerLoad, { alice: 2, bob: 1 });
 });
 
-test('computePRMetrics omits bots and excluded logins from reviewer load', () => {
+test('computePRMetrics counts bot reviewers and still honors excludeLogins', () => {
   const enriched = [
-    { timeToMergeMs: 1000, comments: 0, reviewers: ['alice', 'dependabot[bot]', 'Manager'] }
+    { timeToMergeMs: 1000, comments: 0, reviewers: ['alice', 'copilot[bot]', 'Manager'] }
   ];
   const m = computePRMetrics(enriched, ['manager']);
+  assert.deepEqual(m.reviewerLoad, { alice: 1, 'copilot[bot]': 1 });
+});
+
+test('computePRMetrics excludeLogins also removes bots', () => {
+  const enriched = [
+    { timeToMergeMs: 1000, comments: 0, reviewers: ['alice', 'copilot[bot]'] }
+  ];
+  const m = computePRMetrics(enriched, ['copilot[bot]']);
   assert.deepEqual(m.reviewerLoad, { alice: 1 });
 });
 
@@ -194,15 +202,26 @@ test('computeReviewerStats sorts by events desc', () => {
   assert.deepEqual(stats.map(s => s.login), ['high', 'low']);
 });
 
-test('computeReviewerStats omits bots and excluded logins', () => {
+test('computeReviewerStats counts bot reviewers and still honors excludeLogins', () => {
   const enriched = [
     { reviewEvents: [
       { login: 'alice', state: 'APPROVED' },
-      { login: 'dependabot[bot]', state: 'APPROVED' },
+      { login: 'copilot[bot]', state: 'COMMENTED' },
       { login: 'Manager', state: 'COMMENTED' }
     ] }
   ];
   const stats = computeReviewerStats(enriched, ['manager']);
+  assert.deepEqual(stats.map(s => s.login).sort(), ['alice', 'copilot[bot]']);
+});
+
+test('computeReviewerStats excludeLogins also removes bots', () => {
+  const enriched = [
+    { reviewEvents: [
+      { login: 'alice', state: 'APPROVED' },
+      { login: 'copilot[bot]', state: 'COMMENTED' }
+    ] }
+  ];
+  const stats = computeReviewerStats(enriched, ['copilot[bot]']);
   assert.deepEqual(stats.map(s => s.login), ['alice']);
 });
 
