@@ -202,6 +202,25 @@ export function lineChart({ series, labels, title, sloLines = [], yLabel = Strin
   return svgWrap(parts.join('\n  '));
 }
 
+// Approx px-per-character at font-size 11, used to size the left margin so
+// row labels (reviewer logins — including long bot logins like
+// copilot-pull-request-reviewer[bot]) render fully instead of clipping past
+// x=0. Not exact glyph metrics, just enough to keep labels on-canvas.
+const AXIS_CHAR_WIDTH = 6.2;
+const MARGIN_LEFT_MIN = 150; // room for typical reviewer logins
+const MARGIN_LEFT_MAX = 260; // cap so one long login can't blow out the layout
+const MARGIN_LEFT_PAD = 20; // breathing room around the longest label
+const LABEL_EDGE_PAD = 12; // gap kept between the label's left edge and x=0
+
+// Truncate a label with an ellipsis if it still wouldn't fit within
+// maxWidth px (estimated), even after the margin has been sized up to the cap.
+function fitLabel(label, maxWidth, charWidth = AXIS_CHAR_WIDTH) {
+  const str = String(label ?? '');
+  if (str.length * charWidth <= maxWidth) return str;
+  const maxChars = Math.max(1, Math.floor(maxWidth / charWidth) - 1);
+  return `${str.slice(0, maxChars)}…`;
+}
+
 // Horizontal bar chart: one bar per row, sized by row.value. Labels sit in the
 // left margin, the value is printed at the end of each bar. Height grows with
 // the number of rows, so it suits per-entity breakdowns (one row per engineer).
@@ -210,12 +229,14 @@ export function hBarChart({ rows = [], title, valueLabel = String }) {
   const gap = 8;
   const marginTop = title ? 44 : 14;
   const marginBottom = 14;
-  const marginLeft = 150; // room for reviewer logins
+  const maxLabelLen = rows.length ? Math.max(...rows.map(r => String(r.label ?? '').length)) : 0;
+  const marginLeft = Math.min(MARGIN_LEFT_MAX, Math.max(MARGIN_LEFT_MIN, maxLabelLen * AXIS_CHAR_WIDTH + MARGIN_LEFT_PAD));
   const marginRight = 52; // room for the value label after the bar
   const width = PLOT.width;
   const plotW = width - marginLeft - marginRight;
   const height = marginTop + marginBottom + rows.length * (rowH + gap);
   const max = niceCeil(Math.max(1, ...rows.map(r => r.value ?? 0)));
+  const availableLabelWidth = marginLeft - 8 - LABEL_EDGE_PAD;
 
   const parts = [];
   if (title) parts.push(`<text x="${width / 2}" y="20" font-size="13" fill="#172b4d" text-anchor="middle" font-weight="600">${esc(title)}</text>`);
@@ -225,7 +246,8 @@ export function hBarChart({ rows = [], title, valueLabel = String }) {
     const v = r.value ?? 0;
     const barW = (v / max) * plotW;
     const textY = y + rowH * 0.72;
-    parts.push(`<text x="${marginLeft - 8}" y="${textY.toFixed(1)}" font-size="11" fill="#172b4d" text-anchor="end">${esc(r.label)}</text>`);
+    const label = fitLabel(r.label, availableLabelWidth);
+    parts.push(`<text x="${marginLeft - 8}" y="${textY.toFixed(1)}" font-size="11" fill="#172b4d" text-anchor="end">${esc(label)}</text>`);
     parts.push(`<rect x="${marginLeft}" y="${y}" width="${Math.max(0, barW).toFixed(1)}" height="${rowH}" fill="#0052cc"/>`);
     parts.push(`<text x="${(marginLeft + Math.max(0, barW) + 6).toFixed(1)}" y="${textY.toFixed(1)}" font-size="11" fill="#5e6c84" text-anchor="start">${esc(valueLabel(v))}</text>`);
   });

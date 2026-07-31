@@ -289,7 +289,8 @@ test('fetchTeamPRMetrics filters to the window and computes reviewer load end-to
     if (url.includes('/search/issues')) return jsonRes(200, { items: searchItems });
     if (url.includes('/pulls/1/reviews')) return jsonRes(200, [
       { state: 'APPROVED', user: { login: 'reviewer1' } },
-      { state: 'COMMENTED', user: { login: 'alice' } } // author replying on own PR
+      { state: 'COMMENTED', user: { login: 'alice' } }, // author replying on own PR
+      { state: 'COMMENTED', user: { login: 'copilot[bot]' } }
     ]);
     if (url.includes('/reviews')) return jsonRes(200, []);
     return jsonRes(404, { message: 'not found' });
@@ -298,8 +299,11 @@ test('fetchTeamPRMetrics filters to the window and computes reviewer load end-to
   try {
     const m = await fetchTeamPRMetrics(['org/repo'], start, end, []);
     assert.equal(m.total, 1, 'PR merged at the exclusive end boundary must be excluded');
-    assert.deepEqual(m.reviewerLoad, { reviewer1: 1 });
-    assert.deepEqual(m.reviewerStats, [{ login: 'reviewer1', prs: 1, approvals: 1, events: 1 }]);
+    assert.deepEqual(m.reviewerLoad, { reviewer1: 1, 'copilot[bot]': 1 });
+    assert.deepEqual(m.reviewerStats, [
+      { login: 'reviewer1', prs: 1, approvals: 1, events: 1 },
+      { login: 'copilot[bot]', prs: 1, approvals: 0, events: 1 }
+    ]);
     assert.equal(m.medianTimeToMergeMs, Date.parse('2026-07-15T00:00:00Z') - Date.parse('2026-07-10T00:00:00Z'));
   } finally {
     globalThis.fetch = origFetch;

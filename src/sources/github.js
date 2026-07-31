@@ -164,7 +164,7 @@ export function reviewEventsFromReviews(reviews, authorLogin = '') {
     .map(r => ({ login: r.user.login, state: r.state }));
 }
 
-// Distinct human reviewer logins from a PR's review events (PENDING reviews and
+// Distinct reviewer logins from a PR's review events (PENDING reviews and
 // events without a user are ignored). authorLogin is excluded like above.
 export function reviewersFromReviews(reviews, authorLogin = '') {
   return [...new Set(reviewEventsFromReviews(reviews, authorLogin).map(e => e.login))];

@@ -45,3 +45,25 @@ test('renderReviewLoadChart sizes bars by events and caps at top N', () => {
 test('renderReviewLoadChart returns null when there are no reviewers', () => {
   assert.equal(renderReviewLoadChart([], { displayName: 'X' }), null);
 });
+
+test('hBarChart widens the left margin so a long bot login renders in full', () => {
+  const longLogin = 'copilot-pull-request-reviewer[bot]';
+  const svg = hBarChart({
+    rows: [{ label: longLogin, value: 5 }, { label: 'alice', value: 3 }],
+    title: 'Review load'
+  });
+  // The full login must appear verbatim — not clipped or ellipsized — and the
+  // bars must still render.
+  assert.ok(svg.includes(longLogin), 'long login should render in full');
+  assert.doesNotMatch(svg, /…/);
+  assert.equal((svg.match(/<rect /g) || []).length, 2);
+});
+
+test('hBarChart truncates a label too long to fit even the capped margin', () => {
+  const extremeLogin = 'x'.repeat(80);
+  const svg = hBarChart({
+    rows: [{ label: extremeLogin, value: 1 }]
+  });
+  assert.doesNotMatch(svg, new RegExp(extremeLogin));
+  assert.match(svg, /…/);
+});
