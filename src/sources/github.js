@@ -154,16 +154,20 @@ export function median(arr) {
 // (PENDING reviews and events without a user are ignored). Keeps every event —
 // e.g. a reviewer who requests changes twice then approves yields 3 entries —
 // so downstream can count approvals and total review activity, not just people.
-export function reviewEventsFromReviews(reviews) {
+// Events by authorLogin (the PR author, compared case-insensitively) are
+// dropped: replying to feedback on your own PR is not reviewing it.
+export function reviewEventsFromReviews(reviews, authorLogin = '') {
+  const author = (authorLogin || '').toLowerCase();
   return reviews
     .filter(r => r.state !== 'PENDING' && r.user?.login)
+    .filter(r => !author || r.user.login.toLowerCase() !== author)
     .map(r => ({ login: r.user.login, state: r.state }));
 }
 
 // Distinct human reviewer logins from a PR's review events (PENDING reviews and
-// events without a user are ignored).
-export function reviewersFromReviews(reviews) {
-  return [...new Set(reviewEventsFromReviews(reviews).map(e => e.login))];
+// events without a user are ignored). authorLogin is excluded like above.
+export function reviewersFromReviews(reviews, authorLogin = '') {
+  return [...new Set(reviewEventsFromReviews(reviews, authorLogin).map(e => e.login))];
 }
 
 // Per-reviewer stats across the given PRs. Bots ([bot] suffix) and excludeLogins
@@ -291,7 +295,7 @@ export async function fetchTeamPRMetrics(repoNames, startMs, endMs, excludeLogin
     const mergedAt = pr.pull_request?.merged_at || pr.closed_at;
     const createdMs = new Date(pr.created_at).getTime();
     const mergedMs = mergedAt ? new Date(mergedAt).getTime() : null;
-    const reviewEvents = reviewEventsFromReviews(reviews);
+    const reviewEvents = reviewEventsFromReviews(reviews, pr.user?.login);
 
     return {
       number: pr.number,

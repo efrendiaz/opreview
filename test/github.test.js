@@ -7,6 +7,7 @@ import {
   retryDelayMs,
   mapLimit,
   prMergedInWindow,
+  reviewEventsFromReviews,
   reviewersFromReviews,
   computePRMetrics,
   computeReviewerStats,
@@ -84,6 +85,37 @@ test('prMergedInWindow excludes a PR merged before the window', () => {
 
 test('prMergedInWindow returns false when mergedAt is missing', () => {
   assert.equal(prMergedInWindow(null, 0, 1), false);
+});
+
+// --- reviewEventsFromReviews: the author is not a reviewer of their own PR ---
+test('reviewEventsFromReviews drops the PR author\'s own events (case-insensitive)', () => {
+  const reviews = [
+    { state: 'COMMENTED', user: { login: 'Alice' } },
+    { state: 'COMMENTED', user: { login: 'alice' } },
+    { state: 'APPROVED', user: { login: 'bob' } }
+  ];
+  assert.deepEqual(reviewEventsFromReviews(reviews, 'alice'), [
+    { login: 'bob', state: 'APPROVED' }
+  ]);
+});
+
+test('reviewEventsFromReviews keeps every event when no author is given', () => {
+  const reviews = [
+    { state: 'COMMENTED', user: { login: 'alice' } },
+    { state: 'APPROVED', user: { login: 'bob' } }
+  ];
+  assert.deepEqual(reviewEventsFromReviews(reviews), [
+    { login: 'alice', state: 'COMMENTED' },
+    { login: 'bob', state: 'APPROVED' }
+  ]);
+});
+
+test('reviewersFromReviews excludes the PR author', () => {
+  const reviews = [
+    { state: 'COMMENTED', user: { login: 'alice' } },
+    { state: 'APPROVED', user: { login: 'bob' } }
+  ];
+  assert.deepEqual(reviewersFromReviews(reviews, 'alice').sort(), ['bob']);
 });
 
 // --- reviewersFromReviews ---
@@ -236,7 +268,10 @@ test('fetchTeamPRMetrics filters to the window and computes reviewer load end-to
 
   globalThis.fetch = async (url) => {
     if (url.includes('/search/issues')) return jsonRes(200, { items: searchItems });
-    if (url.includes('/pulls/1/reviews')) return jsonRes(200, [{ state: 'APPROVED', user: { login: 'reviewer1' } }]);
+    if (url.includes('/pulls/1/reviews')) return jsonRes(200, [
+      { state: 'APPROVED', user: { login: 'reviewer1' } },
+      { state: 'COMMENTED', user: { login: 'alice' } } // author replying on own PR
+    ]);
     if (url.includes('/reviews')) return jsonRes(200, []);
     return jsonRes(404, { message: 'not found' });
   };
