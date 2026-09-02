@@ -11,7 +11,10 @@ import {
   reviewersFromReviews,
   computePRMetrics,
   computeReviewerStats,
-  fetchTeamPRMetrics
+  fetchTeamPRMetrics,
+  isSharedRepo,
+  filterExcludedRepos,
+  countBySharing
 } from '../src/sources/github.js';
 
 // --- repoFromUrl ---
@@ -309,4 +312,45 @@ test('fetchTeamPRMetrics filters to the window and computes reviewer load end-to
     globalThis.fetch = origFetch;
     process.env.GITHUB_TOKEN = origToken;
   }
+});
+
+// --- isSharedRepo ---
+test('isSharedRepo is true when the repo carries another team\'s topic', () => {
+  assert.equal(isSharedRepo({ topics: ['oranges', 'pineapples'] }, ['pineapples']), true);
+});
+
+test('isSharedRepo is false when the repo only carries the team\'s own topic', () => {
+  assert.equal(isSharedRepo({ topics: ['oranges', 'lambda'] }, ['pineapples']), false);
+});
+
+test('isSharedRepo is false when the repo has no topics or there are no other teams', () => {
+  assert.equal(isSharedRepo({}, ['pineapples']), false);
+  assert.equal(isSharedRepo({ topics: ['oranges'] }, []), false);
+  assert.equal(isSharedRepo({ topics: ['oranges'] }, undefined), false);
+});
+
+// --- filterExcludedRepos ---
+const REPOS = [
+  { full_name: 'lessonnine/onboarding.spa' },
+  { full_name: 'lessonnine/flow-builder.prototype' }
+];
+
+test('filterExcludedRepos drops repos listed in excludeRepos, case-insensitively', () => {
+  const out = filterExcludedRepos(REPOS, ['LessonNine/Flow-Builder.Prototype']);
+  assert.deepEqual(out.map(r => r.full_name), ['lessonnine/onboarding.spa']);
+});
+
+test('filterExcludedRepos returns every repo when excludeRepos is empty or absent', () => {
+  assert.deepEqual(filterExcludedRepos(REPOS, []), REPOS);
+  assert.deepEqual(filterExcludedRepos(REPOS, undefined), REPOS);
+});
+
+// --- countBySharing ---
+test('countBySharing splits items into exclusive and shared repos', () => {
+  const items = [{ shared: true }, { shared: false }, { shared: true }, {}];
+  assert.deepEqual(countBySharing(items), { exclusive: 2, shared: 2 });
+});
+
+test('countBySharing of an empty list is all zeros', () => {
+  assert.deepEqual(countBySharing([]), { exclusive: 0, shared: 0 });
 });

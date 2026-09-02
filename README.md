@@ -61,6 +61,8 @@ Rollbar tokens are scoped to a single project, so each team needs one per projec
 2. `GITHUB_TOKEN` is the PAT; `GITHUB_ORG` is your GitHub organization name.
 3. Tag each repo with a topic matching your team name (e.g. `team-a`, `team-b`). The script discovers repos via that topic.
 
+   A repo tagged with the topics of two or more teams in `teams.json` is treated as **shared**: it still counts in every team's totals and charts, but is labelled `(shared)` in the per-repo Vulnerabilities and Dependabot PRs notes. To drop a repo from one team's review without touching its topics, list it in that team's `excludeRepos`.
+
 ### Wiz — *not yet wired*
 OAuth is set up but the GraphQL query is a TODO; needs a service account with read access from the security team. Skipped at runtime if env vars are absent.
 
@@ -95,6 +97,8 @@ Each entry in `teams.json` looks like:
 | `jiraBugsJql` | Same, but for bugs (typically a different project). |
 | `rollbarReadTokens` | One token per Rollbar project the team watches. |
 | `githubTopic` | The GitHub repo topic that identifies your team's repos in the org. |
+| `excludeRepos` | Optional. Repos (`org/repo`) that carry the topic but should be left out of the review entirely (metrics table, charts, Review Load). |
+| `excludeMembers` | Optional. GitHub logins to leave out of Review Load (e.g. managers, or bot reviewers such as `cursor[bot]` and `copilot-pull-request-reviewer[bot]`). Case-insensitive. |
 | `confluenceParent.spaceKey` / `.folderId` | Open the parent Confluence folder; the ID is in the URL after `/folder/`. Space key is the short uppercase ID. |
 
 ## Running it

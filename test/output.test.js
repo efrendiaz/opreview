@@ -79,3 +79,87 @@ test('markdown Review Load shows a fallback when there is no review activity', (
   assert.match(md, /## Review Load/);
   assert.match(md, /No review activity/);
 });
+
+// --- Shared repos labelled in the per-repo notes ---
+const DATA_WITH_SHARED = {
+  github: {
+    current: {
+      vulnerabilities: { total: 3, bySeverity: {}, items: [
+        { title: 'v1', url: 'u', severity: 'high', package: 'p', repo: 'org/common.js', shared: true },
+        { title: 'v2', url: 'u', severity: 'low', package: 'p', repo: 'org/common.js', shared: true },
+        { title: 'v3', url: 'u', severity: 'high', package: 'p', repo: 'org/own.spa', shared: false }
+      ] },
+      dependabotPRs: { total: 2, items: [
+        { title: 'd1', url: 'u', createdAt: '2026-06-01T00:00:00Z', repo: 'org/common.js', shared: true },
+        { title: 'd2', url: 'u', createdAt: '2026-06-01T00:00:00Z', repo: 'org/own.spa', shared: false }
+      ] },
+      teamPRs: { reviewerStats: [] }
+    },
+    previous: {}
+  }
+};
+
+function assertSharedLabels(out) {
+  // Vulnerabilities note: "…common.js…</a>: 2 (…)" style differs per renderer,
+  // so match on the label following the repo name/link.
+  assert.match(out, /common\.js[^\n<]*(<\/a>)? \(shared\): 2/);
+  assert.match(out, /common\.js[^\n<]*(<\/a>)? \(shared\): 1/);
+  assert.doesNotMatch(out, /own\.spa[^\n<]*(<\/a>)? \(shared\)/);
+}
+
+test('markdown marks shared repos with a (shared) suffix in both GitHub notes', () => {
+  assertSharedLabels(renderMarkdown(RANGE, DATA_WITH_SHARED, TEAM));
+});
+
+test('html marks shared repos with a (shared) suffix in both GitHub notes', () => {
+  assertSharedLabels(renderHtml(RANGE, DATA_WITH_SHARED, TEAM));
+});
+
+test('storage marks shared repos with a (shared) suffix in both GitHub notes', () => {
+  assertSharedLabels(renderStorage(RANGE, DATA_WITH_SHARED, TEAM, {}));
+});
+
+// --- Vulnerabilities total split by exclusive / shared repos ---
+const DATA_WITH_SPLIT = {
+  github: {
+    current: {
+      vulnerabilities: { total: 3, bySeverity: {}, bySharing: { exclusive: 1, shared: 2 }, items: [] },
+      dependabotPRs: { total: 0, items: [] },
+      teamPRs: { reviewerStats: [] }
+    },
+    previous: {
+      vulnerabilities: { total: 5, bySharing: { exclusive: 2, shared: 3 } },
+      dependabotPRs: { total: 0 }
+    }
+  }
+};
+
+function vulnRow(out) {
+  const m = out.match(/Vulnerabilities[^\n]*\n?/);
+  assert.ok(m, 'Vulnerabilities row present');
+  return m[0];
+}
+
+test('markdown Vulnerabilities cells show exclusive/shared split under the totals', () => {
+  const r = vulnRow(renderMarkdown(RANGE, DATA_WITH_SPLIT, TEAM));
+  assert.match(r, /3 [^|]*<br\/>exclusive: 1<br\/>shared: 2 \|/);
+  assert.match(r, /\| 5<br\/>exclusive: 2<br\/>shared: 3 \|/);
+});
+
+test('html Vulnerabilities cells show exclusive/shared split under the totals', () => {
+  const r = vulnRow(renderHtml(RANGE, DATA_WITH_SPLIT, TEAM));
+  assert.match(r, /3 .*?<br\/?>exclusive: 1<br\/?>shared: 2<\/td>/);
+  assert.match(r, /<td>5<br\/?>exclusive: 2<br\/?>shared: 3<\/td>/);
+});
+
+test('storage Vulnerabilities cells show exclusive/shared split under the totals', () => {
+  const r = vulnRow(renderStorage(RANGE, DATA_WITH_SPLIT, TEAM, {}));
+  assert.match(r, /3 .*?<br\/>exclusive: 1<br\/>shared: 2<\/td>/);
+  assert.match(r, /<td>5<br\/>exclusive: 2<br\/>shared: 3<\/td>/);
+});
+
+test('Vulnerabilities cells stay a plain total when bySharing is absent (older JSON)', () => {
+  const r = vulnRow(renderMarkdown(RANGE, DATA_WITH_SHARED, TEAM));
+  assert.doesNotMatch(r, /exclusive:/);
+  assert.match(r, /^Vulnerabilities \| 3 \| — \|/);
+});

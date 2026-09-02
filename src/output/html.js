@@ -115,8 +115,27 @@ function topOccurrencesNote(top) {
 
 const SEVERITY_COLOR = { critical: '#990000', high: '#d04437', medium: '#e8a200', low: '#36b37e' };
 
+// Repos flagged as shared with another team (see isSharedRepo). Labelled in
+// the per-repo notes so readers can tell exclusive debt from shared debt.
+function sharedRepos(items) {
+  return new Set(items.filter(i => i.shared).map(i => i.repo));
+}
+function sharedSuffix(shared, repo) {
+  return shared.has(repo) ? ' (shared)' : '';
+}
+
+// Vulnerabilities cell: total (with delta) and, when the snapshot carries the
+// exclusive/shared split, one line per group underneath.
+function vulnsCell(v, delta = '') {
+  if (!v || v.total == null) return num(v?.total);
+  const head = num(v.total) + delta;
+  if (!v.bySharing) return head;
+  return `${head}\nexclusive: ${v.bySharing.exclusive}\nshared: ${v.bySharing.shared}`;
+}
+
 function vulnsByRepoNote(items) {
   if (!items || !items.length) return '';
+  const shared = sharedRepos(items);
   const byRepo = new Map();
   for (const a of items) {
     let g = byRepo.get(a.repo);
@@ -132,19 +151,20 @@ function vulnsByRepoNote(items) {
         .filter(k => s[k] > 0)
         .map(k => `<span style="color:${SEVERITY_COLOR[k]}">${k[0].toUpperCase()}${k.slice(1)}: ${s[k]}</span>`);
       if (s.unknown > 0) parts.push(`Unknown: ${s.unknown}`);
-      return `<a href="https://github.com/${esc(repo)}/security/dependabot">${esc(repo)}</a>: ${total} (${parts.join(', ')})`;
+      return `<a href="https://github.com/${esc(repo)}/security/dependabot">${esc(repo)}</a>${sharedSuffix(shared, repo)}: ${total} (${parts.join(', ')})`;
     })
     .join('<br>');
 }
 
 function prsByRepoNote(items) {
   if (!items || !items.length) return '';
+  const shared = sharedRepos(items);
   const counts = new Map();
   for (const p of items) counts.set(p.repo, (counts.get(p.repo) || 0) + 1);
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([repo, n]) =>
-      `<a href="https://github.com/${esc(repo)}/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot">${esc(repo)}</a>: ${n}`
+      `<a href="https://github.com/${esc(repo)}/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot">${esc(repo)}</a>${sharedSuffix(shared, repo)}: ${n}`
     )
     .join('<br>');
 }
@@ -268,11 +288,12 @@ export function renderHtml(range, data, team) {
     out.push(row('Dependabot PRs', `error: ${gh.error}`, '', ''));
   } else {
     const vc = gh.current?.vulnerabilities || {};
-    const vp = gh.previous?.vulnerabilities?.total;
+    const vprev = gh.previous?.vulnerabilities;
+    const vp = vprev?.total;
     out.push(row(
       'Vulnerabilities',
-      num(vc.total) + deltaCount(vc.total, vp),
-      num(vp),
+      vulnsCell(vc, deltaCount(vc.total, vp)),
+      vulnsCell(vprev),
       vulnsByRepoNote(vc.items)
     ));
     const dp = gh.current?.dependabotPRs || {};
