@@ -30,6 +30,16 @@ export async function listTeams() {
   return Object.keys(teams);
 }
 
+// githubTopic values of every team except `name`, deduplicated and without the
+// team's own topic. A repo tagged with any of these is "shared" in the report.
+export function otherTeamTopics(teams, name) {
+  const own = teams[name]?.githubTopic;
+  const topics = Object.entries(teams)
+    .filter(([k, t]) => k !== name && t.githubTopic && t.githubTopic !== own)
+    .map(([, t]) => t.githubTopic);
+  return [...new Set(topics)];
+}
+
 export async function loadTeam(name) {
   const teams = await readTeamsFile();
   const available = Object.keys(teams);
@@ -40,5 +50,5 @@ export async function loadTeam(name) {
   if (!team) {
     throw new Error(`Unknown team "${name}". Available: ${available.join(', ')}`);
   }
-  return { name, ...team };
+  return { name, ...team, otherTeamTopics: otherTeamTopics(teams, name) };
 }

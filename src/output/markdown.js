@@ -89,11 +89,21 @@ function topOccurrencesNote(top) {
 
 const SEVERITY_COLOR = { critical: '#990000', high: '#d04437', medium: '#e8a200', low: '#36b37e' };
 
+// Repos flagged as shared with another team (see isSharedRepo). Labelled in
+// the per-repo notes so readers can tell exclusive debt from shared debt.
+function sharedRepos(items) {
+  return new Set(items.filter(i => i.shared).map(i => i.repo));
+}
+function sharedSuffix(shared, repo) {
+  return shared.has(repo) ? ' (shared)' : '';
+}
+
 // Per-repo Dependabot alert breakdown by severity. The org-wide total is
 // already in the Current Period cell; the notes column zooms in on which
 // repos are carrying the debt so EMs know where to push next.
 function vulnsByRepoNote(items) {
   if (!items || !items.length) return '';
+  const shared = sharedRepos(items);
   const byRepo = new Map();
   for (const a of items) {
     let g = byRepo.get(a.repo);
@@ -109,19 +119,20 @@ function vulnsByRepoNote(items) {
         .filter(k => s[k] > 0)
         .map(k => `<span style="color:${SEVERITY_COLOR[k]}">${k[0].toUpperCase()}${k.slice(1)}: ${s[k]}</span>`);
       if (s.unknown > 0) parts.push(`Unknown: ${s.unknown}`);
-      return `[${repo}](https://github.com/${repo}/security/dependabot): ${total} (${parts.join(', ')})`;
+      return `[${repo}](https://github.com/${repo}/security/dependabot)${sharedSuffix(shared, repo)}: ${total} (${parts.join(', ')})`;
     })
     .join('\n');
 }
 
 function prsByRepoNote(items) {
   if (!items || !items.length) return '';
+  const shared = sharedRepos(items);
   const counts = new Map();
   for (const p of items) counts.set(p.repo, (counts.get(p.repo) || 0) + 1);
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([repo, n]) =>
-      `[${repo}](https://github.com/${repo}/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot): ${n}`
+      `[${repo}](https://github.com/${repo}/pulls?q=is%3Apr+is%3Aopen+author%3Aapp%2Fdependabot)${sharedSuffix(shared, repo)}: ${n}`
     )
     .join('\n');
 }

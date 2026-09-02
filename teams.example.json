@@ -8,6 +8,8 @@
     "rollbarReadTokens": [],
     "wizProjectId": "",
     "githubTopic": "team-a",
+    "excludeRepos": ["your-org/some-repo-to-ignore"],
+    "excludeMembers": ["some-manager-login", "cursor[bot]", "copilot-pull-request-reviewer[bot]"],
     "speedcurveApiKey": "",
     "speedcurveSiteIds": [],
     "confluenceParent": {

@@ -80,6 +80,20 @@ async function listReposByTopic(org, topic) {
   return ghPaginate(`/search/repositories?q=${q}&per_page=100`);
 }
 
+// A repo is shared when, besides the team's own topic, it carries the topic of
+// another team configured in teams.json (see otherTeamTopics in teams.js).
+export function isSharedRepo(repo, otherTeamTopics) {
+  const others = new Set(otherTeamTopics || []);
+  return (repo?.topics || []).some(t => others.has(t));
+}
+
+// Drop repos listed in the team's `excludeRepos` (org/repo, case-insensitive).
+export function filterExcludedRepos(repos, excludeRepos) {
+  const exclude = new Set((excludeRepos || []).map(r => r.toLowerCase()));
+  if (!exclude.size) return repos;
+  return repos.filter(r => !exclude.has((r.full_name || '').toLowerCase()));
+}
+
 // Paginate through a list endpoint sorted by `updated` desc, stopping when an
 // item older than sinceMs is reached. Used by the historical fetchers so we
 // only pull as much closed/resolved data as we need to reconstruct snapshots
@@ -344,7 +358,7 @@ export async function fetchGitHub({ current, previous }, team) {
     throw new Error(`githubTopic not set for team "${team?.name}" in teams.json`);
   }
 
-  const repos = await listReposByTopic(org, team.githubTopic);
+  const repos = filterExcludedRepos(await listReposByTopic(org, team.githubTopic), team.excludeRepos);
   const repoNames = repos.map(r => r.full_name);
 
   // End-of-period snapshots (matches the chart and the "Review period" header).
@@ -360,14 +374,17 @@ export async function fetchGitHub({ current, previous }, team) {
         fetchHistoricalAlerts(r.full_name, sinceMs),
         fetchHistoricalDependabotPRs(r.full_name, sinceMs)
       ]);
-      return { repo: r.full_name, alerts, prs };
+      return { repo: r.full_name, shared: isSharedRepo(r, team.otherTeamTopics), alerts, prs };
     })),
     fetchTeamPRMetrics(repoNames, new Date(current.start).getTime(), currentEndMs, team.excludeMembers),
     fetchTeamPRMetrics(repoNames, new Date(previous.start).getTime(), prevEndMs, team.excludeMembers)
   ]);
 
-  const allAlerts = perRepo.flatMap(r => r.alerts.map(a => ({ ...a, _repo: r.repo })));
-  const allPRs = perRepo.flatMap(r => r.prs.map(p => ({ ...p, _repo: r.repo })));
+  const allAlerts = perRepo.flatMap(r => r.alerts.map(a => ({ ...a, _repo: r.repo, _shared: r.shared })));
+  const allPRs = perRepo.flatMap(r => r.prs.map(p => ({ ...p, _repo: r.repo, _shared: r.shared })));
+
+  const sharedCount = perRepo.filter(r => r.shared).length;
+  const repoCounts = { total: perRepo.length, exclusive: perRepo.length - sharedCount, shared: sharedCount };
 
   function snapshotAt(endMs) {
     const openAlerts = allAlerts.filter(a => alertOpenAt(a, endMs));
@@ -378,7 +395,8 @@ export async function fetchGitHub({ current, previous }, team) {
       url: a.html_url,
       severity: (a.security_advisory?.severity || 'unknown').toLowerCase(),
       package: a.dependency?.package?.name || '',
-      repo: a._repo
+      repo: a._repo,
+      shared: a._shared
     }));
     for (const a of items) {
       bySeverity[Object.hasOwn(bySeverity, a.severity) ? a.severity : 'unknown']++;
@@ -391,14 +409,15 @@ export async function fetchGitHub({ current, previous }, team) {
           title: p.title,
           url: p.html_url,
           createdAt: p.created_at,
-          repo: p._repo
+          repo: p._repo,
+          shared: p._shared
         }))
       }
     };
   }
 
   return {
-    current: { repos: perRepo.length, ...snapshotAt(currentEndMs), teamPRs: currentPRMetrics },
+    current: { repos: repoCounts, ...snapshotAt(currentEndMs), teamPRs: currentPRMetrics },
     previous: { ...snapshotAt(prevEndMs), teamPRs: previousPRMetrics }
   };
 }
@@ -418,7 +437,7 @@ export async function fetchGitHubHistory(team, windows) {
     throw new Error(`githubTopic not set for team "${team?.name}" in teams.json`);
   }
 
-  const repos = await listReposByTopic(org, team.githubTopic);
+  const repos = filterExcludedRepos(await listReposByTopic(org, team.githubTopic), team.excludeRepos);
   const sinceMs = Math.min(...windows.map(w => new Date(w.start).getTime()));
 
   const perRepo = await Promise.all(repos.map(async r => {
