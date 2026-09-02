@@ -131,6 +131,15 @@ function sharedSuffix(shared, repo) {
   return shared.has(repo) ? ' (shared)' : '';
 }
 
+// Vulnerabilities cell: total (with delta) and, when the snapshot carries the
+// exclusive/shared split, one line per group underneath.
+function vulnsCell(v, delta = '') {
+  if (!v || v.total == null) return num(v?.total);
+  const head = num(v.total) + delta;
+  if (!v.bySharing) return head;
+  return `${head}\nexclusive: ${v.bySharing.exclusive}\nshared: ${v.bySharing.shared}`;
+}
+
 function vulnsByRepoNote(items) {
   if (!items || !items.length) return '';
   const shared = sharedRepos(items);
@@ -280,11 +289,12 @@ export function renderStorage(range, data, team, { chartFilenames = [], ownerAcc
     out.push(row('Dependabot PRs', `error: ${gh.error}`, '', ''));
   } else {
     const vc = gh.current?.vulnerabilities || {};
-    const vp = gh.previous?.vulnerabilities?.total;
+    const vprev = gh.previous?.vulnerabilities;
+    const vp = vprev?.total;
     out.push(row(
       'Vulnerabilities',
-      num(vc.total) + deltaCount(vc.total, vp),
-      num(vp),
+      vulnsCell(vc, deltaCount(vc.total, vp)),
+      vulnsCell(vprev),
       vulnsByRepoNote(vc.items)
     ));
     const dp = gh.current?.dependabotPRs || {};

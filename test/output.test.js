@@ -118,3 +118,48 @@ test('html marks shared repos with a (shared) suffix in both GitHub notes', () =
 test('storage marks shared repos with a (shared) suffix in both GitHub notes', () => {
   assertSharedLabels(renderStorage(RANGE, DATA_WITH_SHARED, TEAM, {}));
 });
+
+// --- Vulnerabilities total split by exclusive / shared repos ---
+const DATA_WITH_SPLIT = {
+  github: {
+    current: {
+      vulnerabilities: { total: 3, bySeverity: {}, bySharing: { exclusive: 1, shared: 2 }, items: [] },
+      dependabotPRs: { total: 0, items: [] },
+      teamPRs: { reviewerStats: [] }
+    },
+    previous: {
+      vulnerabilities: { total: 5, bySharing: { exclusive: 2, shared: 3 } },
+      dependabotPRs: { total: 0 }
+    }
+  }
+};
+
+function vulnRow(out) {
+  const m = out.match(/Vulnerabilities[^\n]*\n?/);
+  assert.ok(m, 'Vulnerabilities row present');
+  return m[0];
+}
+
+test('markdown Vulnerabilities cells show exclusive/shared split under the totals', () => {
+  const r = vulnRow(renderMarkdown(RANGE, DATA_WITH_SPLIT, TEAM));
+  assert.match(r, /3 [^|]*<br\/>exclusive: 1<br\/>shared: 2 \|/);
+  assert.match(r, /\| 5<br\/>exclusive: 2<br\/>shared: 3 \|/);
+});
+
+test('html Vulnerabilities cells show exclusive/shared split under the totals', () => {
+  const r = vulnRow(renderHtml(RANGE, DATA_WITH_SPLIT, TEAM));
+  assert.match(r, /3 .*?<br\/?>exclusive: 1<br\/?>shared: 2<\/td>/);
+  assert.match(r, /<td>5<br\/?>exclusive: 2<br\/?>shared: 3<\/td>/);
+});
+
+test('storage Vulnerabilities cells show exclusive/shared split under the totals', () => {
+  const r = vulnRow(renderStorage(RANGE, DATA_WITH_SPLIT, TEAM, {}));
+  assert.match(r, /3 .*?<br\/>exclusive: 1<br\/>shared: 2<\/td>/);
+  assert.match(r, /<td>5<br\/>exclusive: 2<br\/>shared: 3<\/td>/);
+});
+
+test('Vulnerabilities cells stay a plain total when bySharing is absent (older JSON)', () => {
+  const r = vulnRow(renderMarkdown(RANGE, DATA_WITH_SHARED, TEAM));
+  assert.doesNotMatch(r, /exclusive:/);
+  assert.match(r, /^Vulnerabilities \| 3 \| — \|/);
+});

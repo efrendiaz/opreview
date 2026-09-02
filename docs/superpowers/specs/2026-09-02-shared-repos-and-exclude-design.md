@@ -70,3 +70,15 @@ routes noisy bots through `excludeMembers`, so `cursor[bot]` and
 `copilot-pull-request-reviewer[bot]` are added to `excludeMembers` for both
 teams in `teams.json`. `excludeMembers` and `excludeRepos` are now documented
 in `teams.example.json` and the README.
+
+## Addendum: Vulnerabilities total split by ownership
+
+After seeing the August report Efren asked for the Vulnerabilities totals to
+show the exclusive/shared split too, not just the per-repo labels.
+
+- `github.js`: `countBySharing(items)` returns `{ exclusive, shared }`; each
+  snapshot's `vulnerabilities` carries it as `bySharing` (current and previous).
+- Renderers: `vulnsCell(v, delta)` prints the total (with delta) and, when
+  `bySharing` is present, two lines underneath: `exclusive: N` and
+  `shared: N`. Older JSON without `bySharing` renders the plain total.
+- Dependabot PRs keep a plain total (not requested).

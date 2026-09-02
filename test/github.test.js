@@ -13,7 +13,8 @@ import {
   computeReviewerStats,
   fetchTeamPRMetrics,
   isSharedRepo,
-  filterExcludedRepos
+  filterExcludedRepos,
+  countBySharing
 } from '../src/sources/github.js';
 
 // --- repoFromUrl ---
@@ -342,4 +343,14 @@ test('filterExcludedRepos drops repos listed in excludeRepos, case-insensitively
 test('filterExcludedRepos returns every repo when excludeRepos is empty or absent', () => {
   assert.deepEqual(filterExcludedRepos(REPOS, []), REPOS);
   assert.deepEqual(filterExcludedRepos(REPOS, undefined), REPOS);
+});
+
+// --- countBySharing ---
+test('countBySharing splits items into exclusive and shared repos', () => {
+  const items = [{ shared: true }, { shared: false }, { shared: true }, {}];
+  assert.deepEqual(countBySharing(items), { exclusive: 2, shared: 2 });
+});
+
+test('countBySharing of an empty list is all zeros', () => {
+  assert.deepEqual(countBySharing([]), { exclusive: 0, shared: 0 });
 });

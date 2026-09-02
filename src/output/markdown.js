@@ -98,6 +98,15 @@ function sharedSuffix(shared, repo) {
   return shared.has(repo) ? ' (shared)' : '';
 }
 
+// Vulnerabilities cell: total (with delta) and, when the snapshot carries the
+// exclusive/shared split, one line per group underneath.
+function vulnsCell(v, delta = '') {
+  if (!v || v.total == null) return num(v?.total);
+  const head = num(v.total) + delta;
+  if (!v.bySharing) return head;
+  return `${head}\nexclusive: ${v.bySharing.exclusive}\nshared: ${v.bySharing.shared}`;
+}
+
 // Per-repo Dependabot alert breakdown by severity. The org-wide total is
 // already in the Current Period cell; the notes column zooms in on which
 // repos are carrying the debt so EMs know where to push next.
@@ -240,11 +249,12 @@ export function renderMarkdown(range, data, team) {
     lines.push(row('Dependabot PRs', `error: ${gh.error}`, '', ''));
   } else {
     const vc = gh.current?.vulnerabilities || {};
-    const vp = gh.previous?.vulnerabilities?.total;
+    const vprev = gh.previous?.vulnerabilities;
+    const vp = vprev?.total;
     lines.push(row(
       'Vulnerabilities',
-      num(vc.total) + deltaCount(vc.total, vp),
-      num(vp),
+      vulnsCell(vc, deltaCount(vc.total, vp)),
+      vulnsCell(vprev),
       vulnsByRepoNote(vc.items)
     ));
     const dp = gh.current?.dependabotPRs || {};

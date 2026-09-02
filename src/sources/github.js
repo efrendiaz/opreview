@@ -87,6 +87,13 @@ export function isSharedRepo(repo, otherTeamTopics) {
   return (repo?.topics || []).some(t => others.has(t));
 }
 
+// Split snapshot items by repo ownership (see isSharedRepo) for the table cell.
+export function countBySharing(items) {
+  let shared = 0;
+  for (const i of items) if (i.shared) shared++;
+  return { exclusive: items.length - shared, shared };
+}
+
 // Drop repos listed in the team's `excludeRepos` (org/repo, case-insensitive).
 export function filterExcludedRepos(repos, excludeRepos) {
   const exclude = new Set((excludeRepos || []).map(r => r.toLowerCase()));
@@ -402,7 +409,7 @@ export async function fetchGitHub({ current, previous }, team) {
       bySeverity[Object.hasOwn(bySeverity, a.severity) ? a.severity : 'unknown']++;
     }
     return {
-      vulnerabilities: { total: items.length, bySeverity, items },
+      vulnerabilities: { total: items.length, bySeverity, bySharing: countBySharing(items), items },
       dependabotPRs: {
         total: openPRs.length,
         items: openPRs.map(p => ({
