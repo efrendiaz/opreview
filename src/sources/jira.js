@@ -1,4 +1,8 @@
+import { openLinearBugsAtEndOf } from './linear.js';
+
 // Jira: lists of incident tickets and bug tickets opened in the period.
+// Bugs come from Linear instead when the team sets `linearBugs` (see linear.js);
+// incidents stay on Jira.
 // Two separate JQLs per team (jiraJql for incidents, jiraBugsJql for bugs)
 // because they typically live in different projects.
 
@@ -63,8 +67,8 @@ export async function fetchJira({ current, previous }, team) {
   ] = await Promise.all([
     issuesInWindow(current, team.jiraJql),
     issuesInWindow(previous, team.jiraJql),
-    openIssuesAtEndOf(current, team.jiraBugsJql),
-    openIssuesAtEndOf(previous, team.jiraBugsJql)
+    bugsAtEndOf(current, team),
+    bugsAtEndOf(previous, team)
   ]);
 
   return {
@@ -107,6 +111,11 @@ async function openIssuesAtEndOf(window, baseJql) {
   }));
 }
 
+function bugsAtEndOf(window, team) {
+  if (team.linearBugs) return openLinearBugsAtEndOf(window, team.linearBugs);
+  return openIssuesAtEndOf(window, team.jiraBugsJql);
+}
+
 // Trend data: incidents counted by creation in window (events); bugs counted
 // as backlog snapshot at window end.
 export async function fetchJiraHistory(team, windows) {
@@ -119,7 +128,9 @@ export async function fetchJiraHistory(team, windows) {
   return Promise.all(windows.map(async w => {
     const [incidents, bugs] = await Promise.all([
       issuesInWindow(w, team.jiraJql),
-      openAtEndOf(w, team.jiraBugsJql)
+      team.linearBugs
+        ? bugsAtEndOf(w, team).then(list => list.length)
+        : openAtEndOf(w, team.jiraBugsJql)
     ]);
     return {
       label: w.label,

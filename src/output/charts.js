@@ -375,7 +375,7 @@ export function renderTrendCharts({ pd = null, rollbar = null, jira = null, gith
       svg: barChart({
         series: [{ name: 'Open', color: '#ff8b00', points: bugs }],
         labels,
-        title: `${team.displayName} — Open Jira Bugs at end of month`
+        title: `${team.displayName} — Open Bugs at end of month`
       })
     });
   }

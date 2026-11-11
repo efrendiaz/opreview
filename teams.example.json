@@ -1,10 +1,11 @@
 {
-  "$comment": "Copy this to teams.json and fill in. teams.json is gitignored. The user-scoped tokens (PAGERDUTY_TOKEN, JIRA_*, WIZ_CLIENT_*) still live in .env — only team-scoped values go here.",
+  "$comment": "Copy this to teams.json and fill in. teams.json is gitignored. The user-scoped tokens (PAGERDUTY_TOKEN, JIRA_*, LINEAR_API_KEY, WIZ_CLIENT_*) still live in .env — only team-scoped values go here.",
   "team-a": {
     "displayName": "Team A",
     "pagerdutyTeamIds": ["PXXXXX"],
     "jiraJql": "project = TEAMA AND issuetype = Incident",
     "jiraBugsJql": "project = TEAMA AND type = Bug",
+    "linearBugs": { "team": "TEAMA", "labels": ["Bug"] },
     "rollbarReadTokens": [],
     "wizProjectId": "",
     "githubTopic": "team-a",

@@ -163,3 +163,22 @@ test('Vulnerabilities cells stay a plain total when bySharing is absent (older J
   assert.doesNotMatch(r, /exclusive:/);
   assert.match(r, /^Vulnerabilities \| 3 \| — \|/);
 });
+
+// --- Bugs from Linear: the Confluence Jira macro cannot resolve a Linear key ---
+const DATA_WITH_LINEAR_BUG = {
+  jira: {
+    current: { incidents: [], bugs: [{ key: 'WEBC-9', summary: 'Broken <b>', url: 'https://linear.app/babbel/issue/WEBC-9', tracker: 'linear' }] },
+    previous: { incidents: [], bugs: [] }
+  }
+};
+
+test('storage links Linear bugs instead of using the Jira issue macro', () => {
+  const xml = renderStorage(RANGE, DATA_WITH_LINEAR_BUG, TEAM, {});
+  assert.match(xml, /<a href="https:\/\/linear.app\/babbel\/issue\/WEBC-9">WEBC-9<\/a>: Broken &lt;b&gt;/);
+  assert.doesNotMatch(xml, /<ac:parameter ac:name="key">WEBC-9/);
+});
+
+test('storage keeps the Jira issue macro for Jira issues', () => {
+  const data = { jira: { current: { incidents: [{ key: 'BIM-1', summary: 's', url: 'u' }], bugs: [] }, previous: { incidents: [], bugs: [] } } };
+  assert.match(renderStorage(RANGE, data, TEAM, {}), /<ac:parameter ac:name="key">BIM-1<\/ac:parameter>/);
+});

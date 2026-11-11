@@ -67,3 +67,10 @@ test('hBarChart truncates a label too long to fit even the capped margin', () =>
   assert.doesNotMatch(svg, new RegExp(extremeLogin));
   assert.match(svg, /…/);
 });
+
+test('the bugs trend is not labelled as Jira (bugs may come from Linear)', async () => {
+  const { renderTrendCharts } = await import('../src/output/charts.js');
+  const charts = renderTrendCharts({ jira: [{ label: '2026-10', incidents: 0, bugs: 1 }] }, { displayName: 'Oranges' });
+  const bugs = charts.find(c => c.name === 'jira-bugs');
+  assert.match(bugs.svg, /Oranges — Open Bugs at end of month/);
+});

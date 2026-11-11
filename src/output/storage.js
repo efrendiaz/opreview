@@ -61,8 +61,10 @@ function issueList(issues) {
   if (!issues || !issues.length) return '';
   // Use Confluence's Jira issue macro: renders inline as the issue type icon
   // + key + current status (e.g. "DONE" / "IN PROGRESS"), pulled live from Jira.
-  return issues.map(i =>
-    `<ac:structured-macro ac:name="jira" ac:schema-version="1"><ac:parameter ac:name="key">${esc(i.key)}</ac:parameter></ac:structured-macro>`
+  // Linear issues get a plain link: the Jira macro cannot resolve their keys.
+  return issues.map(i => i.tracker === 'linear'
+    ? `<a href="${esc(i.url)}">${esc(i.key)}</a>: ${esc(i.summary)}`
+    : `<ac:structured-macro ac:name="jira" ac:schema-version="1"><ac:parameter ac:name="key">${esc(i.key)}</ac:parameter></ac:structured-macro>`
   ).join('<br/>');
 }
 

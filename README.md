@@ -9,7 +9,7 @@ Configure one or more teams in `teams.json` and the same CLI runs for each.
 For each team, one Confluence page per month with:
 
 - **Header**: team, date, review period, previous review period, owner
-- **Team Metrics table**: PagerDuty (HU/Total alerts, MTTA, MTTR with SLO breach counts), Jira (open incidents and bugs at end of month, with ticket links), Rollbar (open errors at end of month), GitHub (open vulnerabilities and Dependabot PRs)
+- **Team Metrics table**: PagerDuty (HU/Total alerts, MTTA, MTTR with SLO breach counts), Jira (incidents created in the month) and bugs open at end of month from Jira or Linear, with ticket links, Rollbar (open errors at end of month), GitHub (open vulnerabilities and Dependabot PRs)
 - **Trend charts**: PD alerts (stacked HU/LU), MTTA/MTTR with SLO threshold lines, Rollbar open backlog, Jira open backlog, GitHub open backlog (last 6 months for everything except GitHub which is last 2)
 - **Empty section headers** for *Service Metrics* and *Action Items* — the team fills those in manually
 
@@ -56,6 +56,11 @@ Rollbar tokens are scoped to a single project, so each team needs one per projec
 3. The script fetches both active and resolved items so it can compute end-of-month backlog snapshots and surface the top-3 noisiest errors.
 4. Set `ROLLBAR_ACCOUNT_SLUG` in `.env` to your Rollbar account slug (the segment after `/a/` in any Rollbar URL). Optional — without it, top-3 titles render as plain text instead of clickable links.
 
+### Linear (`LINEAR_API_KEY`)
+Only for teams whose board moved from Jira to Linear (see `linearBugs` below).
+1. Linear → **Settings** → **Security & access** → **Personal API keys** → create one with read access.
+2. Paste it into `LINEAR_API_KEY` in `.env`.
+
 ### GitHub (`GITHUB_TOKEN`, `GITHUB_ORG`)
 1. Generate a PAT at https://github.com/settings/tokens with `repo` and `security_events` scopes (or a fine-grained token with equivalent permissions).
 2. `GITHUB_TOKEN` is the PAT; `GITHUB_ORG` is your GitHub organization name.
@@ -95,6 +100,7 @@ Each entry in `teams.json` looks like:
 | `pagerdutyTeamIds` | Open the PD team page; the ID is in the URL (`PXXXXXX`). Comma-separated array if multiple. |
 | `jiraJql` | The JQL you'd run manually to find your team's incidents. Date range gets appended automatically. |
 | `jiraBugsJql` | Same, but for bugs (typically a different project). |
+| `linearBugs` | Optional. `{ "team": "WEBC", "labels": ["Bug", "type:bug"] }` takes the bug backlog from that Linear team instead of `jiraBugsJql`: issues carrying one of the labels, open at the end of each month. Linear keeps the migrated Jira history, so the trend stays continuous. Incidents still come from `jiraJql`. Linear bugs link to Linear in the Confluence page (the Jira macro cannot resolve their keys). |
 | `rollbarReadTokens` | One token per Rollbar project the team watches. |
 | `githubTopic` | The GitHub repo topic that identifies your team's repos in the org. |
 | `excludeRepos` | Optional. Repos (`org/repo`) that carry the topic but should be left out of the review entirely (metrics table, charts, Review Load). |
